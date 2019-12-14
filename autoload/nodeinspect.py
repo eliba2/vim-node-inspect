@@ -4,6 +4,13 @@ import vim
 import socket
 import os
 import os.path
+# from threading import Thread, active_count
+import threading 
+try:
+   import queue
+except ImportError:
+   import Queue as queue
+
 
 
 # var fs = require('fs');
@@ -24,6 +31,19 @@ socket_path = '/tmp/node-inspect.sock'
 breakpoints = []
 initialted = False
 connection = None
+callback_queue = queue.Queue()
+pythonExecTimer = None
+
+
+def NodeInspectExecLoop():
+    while True:
+        try:
+            callback = callback_queue.get(False)
+        except queue.Empty:
+            break
+        if callback != None:
+            callback()
+
 
 def _addBrkptSign(file, line):
     id = brkpt_sign_id + 1
@@ -40,14 +60,13 @@ def _removeSign():
     # print 'sign unplace %i group=%s' % (sign_id, sign_group)
     # vim.command('sign unplace %i group=%s' % (sign_id, sign_group))
     # vim doesn't have the group... should check w nvim.
-    vim.command('sign unplace %d' % (sign_id))
+    vim.command('sign unplace %d group=%s' % (sign_id, sign_group))
 
 
 def _sendEvent(msg):
-    global ipcServer
     s = json.dumps(msg)
     # ipcServer.send(s.encode())
-    connection.send(s.encode())
+    connection.sendall(s.encode())
     # print ("sending msg")
     # global.socket_client.write(JSON.stringify(msg))
 
@@ -60,15 +79,68 @@ def _onDebuggerStopped(m):
         sys.stderr.write("can't open " + m['file'] + "\n")
         return
     vim.command('edit %s' % m['file'])
-    # vim.command('%dG' % m['line'])
+    vim.command('%d' % m['line'])
     _addSign(m['file'], m['line'])
 
 
 
 
-def _startNodeInspector(start_running = False):
+def _startServer(start_running):
     global connection
     global ipcServer
+    global queue
+    initial_stop = True
+    # This server listens on a Unix socket at /var/run/mysocket
+    ipcServer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    ipcServer.bind(socket_path)
+
+    while True:
+        # wait 4 connection
+        ipcServer.listen(1)
+        connection, client_address = ipcServer.accept()
+        try:
+            while True:
+                try:
+                    data = connection.recv(2048)
+                except Exception:
+                    break
+                # print >>sys.stderr, 'received "%s"' % data
+                if data:
+                    msg = json.loads(data)
+                    if msg['m'] == 'nd_stopped':
+                        # in case the user starts the debugger running
+                        if initial_stop == True:
+                            callback_queue.put(
+                                _sendEvent({
+                                    'm': 'nd_setbreakpoints',
+                                    'breakpoints': breakpoints
+                                })
+                            )
+                            if start_running == True:
+                                callback_queue.put(_sendEvent({ 'm': 'nd_continue' }))
+                            else:
+                                callback_queue.put(lambda: _onDebuggerStopped(msg))
+                                initial_stop = False
+                        else:
+                            callback_queue.put(lambda: _onDebuggerStopped(msg))
+                    else:
+                        sys.stderr.write('received unknown msg from inspect: '+msg);
+                # else:
+                #     sys.stderr.write("no more data from \n" + client_address + "\n")
+            # break
+        finally:
+            # Clean up the connection
+            connection.close()
+
+
+
+
+
+
+
+def _startNodeInspector(start_running = False):
+    global _started
+    global pythonExecTimer
     try:
         os.unlink(socket_path)
     except OSError:
@@ -76,7 +148,6 @@ def _startNodeInspector(start_running = False):
             raise
     # initial
     _started = True
-    initial_stop = True
     # get working win
     # start_win = vim.current.window
     start_win = vim.eval("winnr()")
@@ -95,53 +166,19 @@ def _startNodeInspector(start_running = False):
     vim.command('set nonu')
     # create terminal, nvim node
     # vim.command('call termopen("node")')
-    termcmd = '''call termopen ("node node-inspect/cli.js %s", {'on_exit': 'OnNodeDebuggerExit'})'''%f
+    termcmd = '''call termopen ("node node-inspect/cli.js %s", {'on_exit': 'OnNodeInspectExit'})'''%f
     # print(termcmd)
     term_id = vim.command(termcmd)
     # term_id = vim.command("call termopen (\"node node-inspect/cli.js %(f) {'on_exit': 'OnNodeDebuggerExit'}\"")
     repl_buf = vim.current.buffer
     # switch back to start buf
     vim.command('%s.wincmd w'%start_win)
+    # start the server
+    serverThread = threading.Thread(target=_startServer, args=(start_running,))
+    serverThread.start()
 
-    # This server listens on a Unix socket at /var/run/mysocket
-    ipcServer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    ipcServer.bind(socket_path)
-
-    while True:
-        # wait 4 connection
-        ipcServer.listen(1)
-        connection, client_address = ipcServer.accept()
-        try:
-            data = connection.recv(2048)
-            # print >>sys.stderr, 'received "%s"' % data
-            if data:
-                msg = json.loads(data)
-                if msg['m'] == 'nd_stopped':
-                    # in case the user starts the debugger running
-                    if initial_stop == True:
-                        _sendEvent({
-                            'm': 'nd_setbreakpoints',
-                            'breakpoints': breakpoints
-                        })
-                        if start_running == True:
-                            _sendEvent({ 'm': 'nd_continue' })
-                                # setTimeout(() => {
-                                #         _sendEvent({m: 'nd_continue'})
-                                # },100);
-                        else:
-                            _onDebuggerStopped(msg)
-                            initial_stop = False
-                    else:
-                        _onDebuggerStopped(msg);
-
-                else:
-                    sys.stderr.write('received unknown msg from inspect: '+msg);
-            else:
-                sys.stderr.write("no more data from \n" + client_address + "\n")
-            break
-        finally:
-            # Clean up the connection
-            connection.close()
+    # detect changes
+    pythonExecTimer = vim.eval("timer_start(500, 'NodeInspectTimerCallback', {'repeat': -1})")
 
 
 def initNodeInspect():
@@ -170,35 +207,35 @@ def StartRunNodeInspect():
     _removeSign()
     _startNodeInspector(False)
 # step over (next)
-def NodeInspectStep():
-    if _isRunning() == False:
-        return
+def NodeInspectStepOver():
+    # if _isRunning() == False:
+        # return
     _removeSign()
-    _sendEvent({m: 'nd_next'})
+    _sendEvent({'m': 'nd_next'})
 # continue
 def NodeInspectContinue():
-    if _isRunning()==False:
-        return
+    # if _isRunning()==False:
+        # return
     _removeSign();
-    _sendEvent({m: 'nd_continue'})
+    _sendEvent({'m': 'nd_continue'})
 # step into
 def NodeInspectStepInto():
-    if _isRunning()==False:
-        return
+    # if _isRunning()==False:
+        # return
     _removeSign()
-    _sendEvent({m: 'nd_into'})
+    _sendEvent({'m': 'nd_into'})
 # stop debugging
 def NodeInspectStop():
-    if _isRunning()==False:
-        return
+    # if _isRunning()==False:
+        # return
     _removeSign()
-    _sendEvent({m: 'nd_kill'})
+    _sendEvent({'m': 'nd_kill'})
 # step out
 def NodeInspectStepOut():
-    if _isRunning()==False:
-        return
+    # if _isRunning()==False:
+        # return
     _removeSign();
-    _sendEvent({m: 'nd_out'})
+    _sendEvent({'m': 'nd_out'})
 # add breakpoint
 def NodeInspectToggleBreakpoint():
     file = vim.eval("expand('%:.')")
@@ -215,31 +252,40 @@ def NodeInspectToggleBreakpoint():
         del breakpoints[foundIndex]
         if _started:
             _sendEvent({
-                m: 'nd_removebrkpt',
-                file: file,
-                line: line
+                'm': 'nd_removebrkpt',
+                'file': file,
+                'line': line
             })
     else:
         # breakpoint doesn't exists, add it
         id = _addBrkptSign(file, line)
         breakpoints.append({
-            "file": file,
-            "line": line,
-            "id": id
+            'file': file,
+            'line': line,
+            'id': id
         })
         if _started:
             _sendEvent({
-                m: 'nd_addbrkpt',
-                file: file,
-                line: line
+                'm': 'nd_addbrkpt',
+                'file': file,
+                'line': line
             })
 
 
 
 # on debuggger exit
-# def NodeInspectContinue():
-# plugin.registerFunction( 'OnNodeDebuggerExit', [ plugin.nvim.buffer, onNodeDebuggerExit ]);
-
+def NodeInspectCleanup():
+    global connection
+    global pythonExecTimer
+    vim.command('sign unplace %d group=%s' % (sign_id, sign_group))
+    if pythonExecTimer != None:
+        vim.eval("timer_stop(%s)" % pythonExecTimer)
+        pythonExecTimer = None
+    connection.close()
+    # ipcServer.shutdown(socket.SHUT_RDWR)
+    ipcServer.close()
+    _started = False
+    vim.command('echo "NodeInspectExited"')
 
 
 # start node inspect, paused
@@ -250,7 +296,7 @@ def StartNodeInspect():
         initialted = True
     _removeSign()
     if _started:
-        print ("restarting node-vim-inspect")
+        # print ("restarting node-vim-inspect")
         _sendEvent('{"m": "nd_restart"}')
         return
     # print ("starting node-vim-inspectpr")

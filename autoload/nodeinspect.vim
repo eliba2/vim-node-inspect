@@ -26,7 +26,21 @@ function! s:NodeInspectToggleBreakpoint()
 	endif
 endfunction
 
+function! s:NodeInspectStepOver()
+	if s:has_supported_python == 2
+		python3 NodeInspectStepOver()
+	else
+		python NodeInspectStepOver()
+	endif
+endfunction
 
+function! s:NodeInspectStepInto()
+	if s:has_supported_python == 2
+		python3 NodeInspectStepInto()
+	else
+		python NodeInspectStepInto()
+	endif
+endfunction
 
 function! s:StartNodeInspect()
 	" load the python module, if not already loaded
@@ -57,6 +71,21 @@ function! s:StartNodeInspect()
 	endif
 endfunction
 
+function! OnNodeInspectExit(a,b,c)
+	if s:has_supported_python == 2
+		python3 NodeInspectCleanup()
+	else
+		python NodeInspectCleanup()
+	endif
+endfunction
+
+function! NodeInspectTimerCallback(timer)
+	if s:has_supported_python == 2
+		python3 NodeInspectExecLoop()
+	else
+		python NodeInspectExecLoop()
+	endif
+endfunction
 
 function! nodeinspect#NodeInspectToggleBreakpoint()
 	if !exists('g:nodeinspect_py_loaded')
@@ -65,6 +94,23 @@ function! nodeinspect#NodeInspectToggleBreakpoint()
 	endif
 	call s:NodeInspectToggleBreakpoint()
 endfunction
+
+function! nodeinspect#NodeInspectStepOver()
+	if !exists('g:nodeinspect_py_loaded')
+		echo "node-inspect not started"
+		return
+	endif
+	call s:NodeInspectStepOver()
+endfunction
+
+function! nodeinspect#NodeInspectStepInto()
+	if !exists('g:nodeinspect_py_loaded')
+		echo "node-inspect not started"
+		return
+	endif
+	call s:NodeInspectStepInto()
+endfunction
+
 
 function! nodeinspect#StartNodeInspect()
     call s:StartNodeInspect()
