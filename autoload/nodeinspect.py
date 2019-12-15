@@ -97,7 +97,10 @@ def _startServer(start_running):
     while True:
         # wait 4 connection
         ipcServer.listen(1)
-        connection, client_address = ipcServer.accept()
+        try:
+            connection, client_address = ipcServer.accept()
+        except Exception:
+            break
         try:
             while True:
                 try:
@@ -188,6 +191,7 @@ def initNodeInspect():
     vim.command('sign define %s text=() texthl=SyntasticErrorSign' % sign_brkpt);
 
 def _isRunning():
+    global _started
     if _started==False:
         vim.command('echo "debugger not running"')
     return _started
@@ -196,7 +200,8 @@ def _isRunning():
 ### API
 
 # start debugger and execute 
-def StartRunNodeInspect():
+def NodeInspectStartRun():
+    global _started
     global initialted
     if _started == True:
         vim.command('echo "debugger already running"')
@@ -238,6 +243,7 @@ def NodeInspectStepOut():
     _sendEvent({'m': 'nd_out'})
 # add breakpoint
 def NodeInspectToggleBreakpoint():
+    global _started
     file = vim.eval("expand('%:.')")
     line = vim.eval("line('.')")
     # check if its already set. if so, remove it
@@ -250,7 +256,7 @@ def NodeInspectToggleBreakpoint():
         # this breakpoint exists, remove it
         _removeBrkptSign(breakpoints[foundIndex]['id'], breakpoints[foundIndex]['file']);
         del breakpoints[foundIndex]
-        if _started:
+        if _started == True:
             _sendEvent({
                 'm': 'nd_removebrkpt',
                 'file': file,
@@ -264,7 +270,7 @@ def NodeInspectToggleBreakpoint():
             'line': line,
             'id': id
         })
-        if _started:
+        if _started == True:
             _sendEvent({
                 'm': 'nd_addbrkpt',
                 'file': file,
@@ -277,29 +283,28 @@ def NodeInspectToggleBreakpoint():
 def NodeInspectCleanup():
     global connection
     global pythonExecTimer
+    global _started
     vim.command('sign unplace %d group=%s' % (sign_id, sign_group))
     if pythonExecTimer != None:
         vim.eval("timer_stop(%s)" % pythonExecTimer)
         pythonExecTimer = None
     connection.close()
-    # ipcServer.shutdown(socket.SHUT_RDWR)
     ipcServer.close()
     _started = False
     vim.command('echo "NodeInspectExited"')
 
 
 # start node inspect, paused
-def StartNodeInspect():
+def NodeInspectStart():
     global initialted
+    global _started
     if initialted == False:
         initNodeInspect()
         initialted = True
     _removeSign()
-    if _started:
-        # print ("restarting node-vim-inspect")
-        _sendEvent('{"m": "nd_restart"}')
+    if _started == True:
+        _sendEvent("{'m': 'nd_restart'}")
         return
-    # print ("starting node-vim-inspectpr")
     _startNodeInspector(False)
 
 
