@@ -144,6 +144,7 @@ def _startServer(start_running):
 def _startNodeInspector(start_running = False):
     global _started
     global pythonExecTimer
+    global repl_buf
     try:
         os.unlink(socket_path)
     except OSError:
@@ -173,7 +174,7 @@ def _startNodeInspector(start_running = False):
     # print(termcmd)
     term_id = vim.command(termcmd)
     # term_id = vim.command("call termopen (\"node node-inspect/cli.js %(f) {'on_exit': 'OnNodeDebuggerExit'}\"")
-    repl_buf = vim.current.buffer
+    # repl_buf = vim.current.buffer
     # switch back to start buf
     vim.command('%s.wincmd w'%start_win)
     # start the server
@@ -233,8 +234,12 @@ def NodeInspectStepInto():
 def NodeInspectStop():
     # if _isRunning()==False:
         # return
-    _removeSign()
+    global repl_buf
     _sendEvent({'m': 'nd_kill'})
+    _removeSign()
+    NodeInspectCleanup()
+    vim.command("%sbd!" % repl_buf)
+    # close the window
 # step out
 def NodeInspectStepOut():
     # if _isRunning()==False:
