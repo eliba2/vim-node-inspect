@@ -1,6 +1,7 @@
 
 
 let s:has_supported_python = 0
+let s:initiated = 0
 if has('python3')
     let s:has_supported_python = 2
 elseif has('python')"
@@ -87,6 +88,11 @@ function! s:NodeInspectStart(start)
 		endif"
 		let g:nodeinspect_py_loaded = 1
 	endif
+	" register global on exit
+	if s:initiated == 0
+			let s:initiated = 1
+			autocmd VimLeavePre * call OnNodeInspectExit(0,0,0)
+	endif
 
 	" start
 	if a:start == 0
@@ -102,7 +108,6 @@ function! s:NodeInspectStart(start)
 			python NodeInspectStartRun()
 		endif
 	endif
-
 endfunction
 
 function! OnNodeInspectExit(a,b,c)
@@ -120,6 +125,10 @@ function! NodeInspectTimerCallback(timer)
 		python NodeInspectExecLoop()
 	endif
 endfunction
+
+
+" Callable functions
+
 
 function! nodeinspect#NodeInspectToggleBreakpoint()
 	if !exists('g:nodeinspect_py_loaded')
