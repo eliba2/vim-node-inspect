@@ -2,7 +2,7 @@
 A wrapper over node-inspect. Runs node-inspect in (n)vim.
 
 ## Requirements
-Vim8/Neovim +Python.
+Vim8/Neovim.
 
 ## Installation
 Install with your favorite package manager. For vim-plug its
