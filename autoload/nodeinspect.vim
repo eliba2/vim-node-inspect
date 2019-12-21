@@ -1,5 +1,3 @@
-
-
 let s:has_supported_python = 0
 let s:initiated = 0
 let s:channel = 0
@@ -8,75 +6,6 @@ let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
-
-
-
-if has('python3')
-    let s:has_supported_python = 2
-elseif has('python')"
-    let s:has_supported_python = 1
-endif
-
-if !s:has_supported_python
-    function! s:NodeInspectDidNotLoad()
-        echohl WarningMsg|echomsg "Node Inspect requires Vim to be compiled with Python 2.4+"|echohl None
-    endfunction
-    call s:NodeInspectDidNotLoad()
-    finish
-endif
-
-let s:plugin_path = escape(expand('<sfile>:p:h'), '\')
-
-
-function! s:NodeInspectToggleBreakpoint()
-	if s:has_supported_python == 2
-		python3 NodeInspectToggleBreakpoint()
-	else
-		python NodeInspectToggleBreakpoint()
-	endif
-endfunction
-
-function! s:NodeInspectStepOver()
-	if s:has_supported_python == 2
-		python3 NodeInspectStepOver()
-	else
-		python NodeInspectStepOver()
-	endif
-endfunction
-
-function! s:NodeInspectStepInto()
-	if s:has_supported_python == 2
-		python3 NodeInspectStepInto()
-	else
-		python NodeInspectStepInto()
-	endif
-endfunction
-
-
-function! s:NodeInspectStop()
-	if s:has_supported_python == 2
-		python3 NodeInspectStop()
-	else
-		python NodeInspectStop()
-	endif
-endfunction
-
-function! s:NodeInspectContinue()
-	if s:has_supported_python == 2
-		python3 NodeInspectContinue()
-	else
-		python NodeInspectContinue()
-	endif
-endfunction
-
-function! s:NodeInspectStepOut()
-	if s:has_supported_python == 2
-		python3 NodeInspectStepOut()
-	else
-		python NodeInspectStepOut()
-	endif
-endfunction
-
 
 
 func s:addBrkptSign(file, line)
@@ -97,8 +26,40 @@ func s:removeSign()
     " print 'sign unplace %i group=%s' % (sign_id, sign_group)
     " vim.command('sign unplace %i group=%s' % (sign_id, sign_group))
     " vim doesn't have the group... should check w nvim.
-    execute('sign unplace %d group=%s' % (sign_id, sign_group))
+    execute "sign unplace " . s:sign_id . " group=" . s:sign_group
 endfunc
+
+
+func s:sendEvent(e)
+	call ch_sendraw(s:channel, a:e)
+endfunc
+
+
+function! s:NodeInspectToggleBreakpoint()
+endfunction
+
+function! s:NodeInspectStepOver()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_next"}')
+endfunction
+
+function! s:NodeInspectStepInto()
+endfunction
+
+
+function! s:NodeInspectStop()
+endfunction
+
+function! s:NodeInspectContinue()
+endfunction
+
+function! s:NodeInspectStepOut()
+	if s:has_supported_python == 2
+		python3 NodeInspectStepOut()
+	else
+		python NodeInspectStepOut()
+	endif
+endfunction
 
 
 
@@ -133,7 +94,6 @@ function! s:NodeInspectStart(start)
 		" breakpoint sign
     execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
 	endif
-
 	" start
 	let g:started = 1
 	let s:start_win = winnr()
@@ -147,10 +107,8 @@ function! s:NodeInspectStart(start)
 	else
 		execute "let s:term_id = term_start ('node node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
 	endif
-
 	" switch back to start buf
 	execute s:start_win . "wincmd w"
-	" try and connect from vim; can I remove python ?
 	sleep 150m
 	let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
 endfunction
@@ -159,27 +117,20 @@ endfunction
 
 
 function! OnNodeInspectExit(a,b,c)
-	if s:has_supported_python == 2
-		python3 NodeInspectCleanup()
-	else
-		python NodeInspectCleanup()
-	endif
+	" if s:has_supported_python == 2
+	" 	python3 NodeInspectCleanup()
+	" else
+	" 	python NodeInspectCleanup()
+	" endif
 endfunction
 
-function! NodeInspectTimerCallback(timer)
-	if s:has_supported_python == 2
-		python3 NodeInspectExecLoop()
-	else
-		python NodeInspectExecLoop()
-	endif
-endfunction
 
 
 " Callable functions
 
 
 function! nodeinspect#NodeInspectToggleBreakpoint()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
@@ -187,7 +138,7 @@ function! nodeinspect#NodeInspectToggleBreakpoint()
 endfunction
 
 function! nodeinspect#NodeInspectStepOver()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
@@ -195,7 +146,7 @@ function! nodeinspect#NodeInspectStepOver()
 endfunction
 
 function! nodeinspect#NodeInspectStepInto()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
@@ -203,7 +154,7 @@ function! nodeinspect#NodeInspectStepInto()
 endfunction
 
 function! nodeinspect#NodeInspectStepOut()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
@@ -211,7 +162,7 @@ function! nodeinspect#NodeInspectStepOut()
 endfunction
 
 function! nodeinspect#NodeInspectContinue()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
@@ -219,7 +170,7 @@ function! nodeinspect#NodeInspectContinue()
 endfunction
 
 function! nodeinspect#NodeInspectStop()
-	if !exists('g:nodeinspect_py_loaded')
+	if s:initiated == 0
 		echo "node-inspect not started"
 		return
 	endif
