@@ -170,7 +170,9 @@ def _startNodeInspector(start_running = False):
     vim.command('set nonu')
     # create terminal, nvim node
     # vim.command('call termopen("node")')
-    termcmd = '''call termopen ("node node-inspect/cli.js %s", {'on_exit': 'OnNodeInspectExit'})'''%f
+    # termcmd = '''call termopen ("node node-inspect/cli.js %s", {'on_exit': 'OnNodeInspectExit'})'''%f
+    # termcmd = '''call term_start ("node node-inspect/cli.js %s", {'term_finish':'close', 'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})'''%f
+    termcmd = '''call term_start ("node node-inspect/cli.js %s", {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})'''%f
     # print(termcmd)
     term_id = vim.command(termcmd)
     # term_id = vim.command("call termopen (\"node node-inspect/cli.js %(f) {'on_exit': 'OnNodeDebuggerExit'}\"")
