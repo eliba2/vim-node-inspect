@@ -6,6 +6,7 @@ let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
+let s:breakpoints = {}
 
 
 func s:addBrkptSign(file, line)
@@ -34,8 +35,32 @@ func s:sendEvent(e)
 	call ch_sendraw(s:channel, a:e)
 endfunc
 
+func s:NodeInspectCleanup()
+	let s:started = 0
+endfunc
 
 function! s:NodeInspectToggleBreakpoint()
+	let file = expand('%:.')
+	let line = line('.')
+	" check if the file is in the directory
+	if has_key(s:breakpoints, file) == 1
+		" chexk for relevant line
+		if has_key (s:breakpoints[file], line) == 1
+			" its in, remove it
+			call remove(s:breakpoints[file], line)
+			call s:sendEvent('{"m": "nd_removebrkpt", "file":' . file . ', "line":' . line . '}')
+			" if the dictionary is empty, remove the file entirely
+			if len(s:breakpoints[file]) == 0
+				call remove(s:breakpoints, file)
+			endif
+	else
+		" does not exist, add it, file and line
+		let s:breakpoints[file] = {}
+		let s:breakpoints[file][line] = 1
+		" send event only if node-inspect was started
+		if s:started == 1
+			call s:sendEvent('{"m": "nd_addbrkpt", "file":' . file . ', "line":' . line . '}')
+	endif
 endfunction
 
 function! s:NodeInspectStepOver()
@@ -44,21 +69,28 @@ function! s:NodeInspectStepOver()
 endfunction
 
 function! s:NodeInspectStepInto()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_into"}')
 endfunction
 
 
 function! s:NodeInspectStop()
+	call s:sendEvent('{"m": "nd_kill"}')
+	call s:removeSign()
+  call s:NodeInspectCleanup()
+	execute s:repl_buf . "bd!"
 endfunction
+
 
 function! s:NodeInspectContinue()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_continue"}')
 endfunction
 
+
 function! s:NodeInspectStepOut()
-	if s:has_supported_python == 2
-		python3 NodeInspectStepOut()
-	else
-		python NodeInspectStepOut()
-	endif
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_out"}')
 endfunction
 
 
@@ -95,7 +127,7 @@ function! s:NodeInspectStart(start)
     execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
 	endif
 	" start
-	let g:started = 1
+	let s:started = 1
 	let s:start_win = winnr()
 	let file = expand('%:p')
 	execute "bo 10new"
@@ -111,17 +143,15 @@ function! s:NodeInspectStart(start)
 	execute s:start_win . "wincmd w"
 	sleep 150m
 	let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
+	" send breakpoints, if any
+	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
 endfunction
 
 
 
 
 function! OnNodeInspectExit(a,b,c)
-	" if s:has_supported_python == 2
-	" 	python3 NodeInspectCleanup()
-	" else
-	" 	python NodeInspectCleanup()
-	" endif
+	call s:NodeInspectCleanup()
 endfunction
 
 
