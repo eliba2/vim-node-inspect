@@ -1,5 +1,8 @@
 
 console.log("start");
 var k=5;
-console.log(k);
+function x() {
+	var k = 2;
+	console.log(k);
+}
 console.log("finish");

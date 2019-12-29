@@ -1,5 +1,6 @@
 let s:has_supported_python = 0
 let s:initiated = 0
+let s:plugin_path = expand('<sfile>:h:h')
 let s:channel = 0
 let s:sign_id = 2
 let s:brkpt_sign_id = 3
@@ -8,6 +9,7 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 
+autocmd VimLeavePre * call OnNodeInspectExit()
 
 func s:addBrkptSign(file, line)
     id = brkpt_sign_id + 1
@@ -37,6 +39,7 @@ endfunc
 
 func s:NodeInspectCleanup()
 	let s:started = 0
+	call s:removeSign()
 endfunc
 
 function! s:NodeInspectToggleBreakpoint()
@@ -95,10 +98,6 @@ endfunction
 
 
 
-
-
-
-
 func s:onDebuggerStopped(mes)
 	execute "edit " . a:mes["file"]
 	execute ":" . a:mes["line"]
@@ -120,7 +119,6 @@ function! s:NodeInspectStart(start)
 	" register global on exit, add signs 
 	if s:initiated == 0
 		let s:initiated = 1
-		autocmd VimLeavePre * call OnNodeInspectExit(0,0,0)
 		" debug sign 
     execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
 		" breakpoint sign
@@ -135,9 +133,9 @@ function! s:NodeInspectStart(start)
 	let s:repl_buf = bufnr('%')
 	set nonu
 	if has("nvim")
-		termcmd = '''call term_start ("node node-inspect/cli.js %s", {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})'''%f
+		execute = "call term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . " {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
 	else
-		execute "let s:term_id = term_start ('node node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
+		execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 	endif
 	" switch back to start buf
 	execute s:start_win . "wincmd w"
@@ -150,8 +148,10 @@ endfunction
 
 
 
-function! OnNodeInspectExit(a,b,c)
-	call s:NodeInspectCleanup()
+function! OnNodeInspectExit(...)
+	if s:initiated == 1
+		call s:NodeInspectCleanup()
+	endif
 endfunction
 
 
