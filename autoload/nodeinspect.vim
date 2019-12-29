@@ -38,7 +38,6 @@ func s:sendEvent(e)
 endfunc
 
 func s:NodeInspectCleanup()
-	let s:started = 0
 	call s:removeSign()
 endfunc
 
@@ -61,8 +60,9 @@ function! s:NodeInspectToggleBreakpoint()
 		let s:breakpoints[file] = {}
 		let s:breakpoints[file][line] = 1
 		" send event only if node-inspect was started
-		if s:started == 1
+		if s:initiated == 1
 			call s:sendEvent('{"m": "nd_addbrkpt", "file":' . file . ', "line":' . line . '}')
+		endif
 	endif
 endfunction
 
@@ -99,6 +99,7 @@ endfunction
 
 
 func s:onDebuggerStopped(mes)
+	call win_gotoid(s:start_win)
 	execute "edit " . a:mes["file"]
 	execute ":" . a:mes["line"]
 	call s:addSign(a:mes["file"], a:mes["line"])
@@ -123,24 +124,27 @@ function! s:NodeInspectStart(start)
     execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
 		" breakpoint sign
     execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
-	endif
-	" start
-	let s:started = 1
-	let s:start_win = winnr()
-	let file = expand('%:p')
-	execute "bo 10new"
-	let s:repl_win = winnr()
-	let s:repl_buf = bufnr('%')
-	set nonu
-	if has("nvim")
-		execute = "call term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . " {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
+		" start
+		" let s:started = 1
+		let s:start_win = win_getid()
+		let file = expand('%:p')
+		execute "bo 10new"
+		let s:repl_win = winnr()
+		let s:repl_buf = bufnr('%')
+		set nonu
+		if has("nvim")
+			execute = "call term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . " {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
+		else
+			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+		endif
+		" switch back to start buf
+		" execute s:start_win . "wincmd w"
+		call win_gotoid(s:start_win)
+		sleep 150m
+		let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
 	else
-		execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+		call s:sendEvent('{"m": "nd_restart"}')
 	endif
-	" switch back to start buf
-	execute s:start_win . "wincmd w"
-	sleep 150m
-	let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
 	" send breakpoints, if any
 	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
 endfunction
