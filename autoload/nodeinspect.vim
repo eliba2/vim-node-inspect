@@ -34,11 +34,16 @@ endfunc
 
 
 func s:sendEvent(e)
-	call ch_sendraw(s:channel, a:e)
+	if has("nvim")
+		call chansend(s:channel, a:e)
+	else
+		call ch_sendraw(s:channel, a:e)
+	endif
 endfunc
 
 func s:NodeInspectCleanup()
 	call s:removeSign()
+	let s:initiated = 0
 endfunc
 
 function! s:NodeInspectToggleBreakpoint()
@@ -107,12 +112,21 @@ endfunc
 
 
 func OnNodeMessage(channel, msg)
-	let mes = json_decode(a:msg)
+	if len(a:msg) == 0 || len(a:msg) == 1 &&  len(a:msg[0]) == 0
+		let mes = ''
+	else
+		let mes = json_decode(a:msg)
+	endif
 	if mes["m"] == "nd_stopped"
 		call s:onDebuggerStopped(mes)
 	else
 		echo "vim-node-inspect: unknown message"
 	endif
+endfunc
+
+
+func OnNodeNvimMessage(channel, msg, name)
+	call OnNodeMessage(a:channel, a:msg)
 endfunc
 
 
@@ -129,19 +143,24 @@ function! s:NodeInspectStart(start)
 		let s:start_win = win_getid()
 		let file = expand('%:p')
 		execute "bo 10new"
-		let s:repl_win = winnr()
+		let s:repl_win = win_getid()
 		let s:repl_buf = bufnr('%')
 		set nonu
 		if has("nvim")
-			execute = "call term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . " {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
+			execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
 		else
 			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 		endif
 		" switch back to start buf
-		" execute s:start_win . "wincmd w"
 		call win_gotoid(s:start_win)
 		sleep 150m
-		let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
+		if has("nvim")
+			let s:channel = sockconnect("tcp", "localhost:9514", {"on_data": "OnNodeNvimMessage"})
+			" echo "xxxxxx " .s:channel
+		else
+			let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
+		endif
+		" to_do check return value from socket for failure
 	else
 		call s:sendEvent('{"m": "nd_restart"}')
 	endif
@@ -158,6 +177,15 @@ function! OnNodeInspectExit(...)
 	endif
 endfunction
 
+
+function! OnNodeInspectNvimExit(...)
+	" close the window as there's no such option in termopen
+	call win_gotoid(s:repl_win)
+	execute "bd!"
+	if s:initiated == 1
+		call s:NodeInspectCleanup()
+	endif
+endfunction
 
 
 " Callable functions
