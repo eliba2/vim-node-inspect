@@ -1099,7 +1099,7 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_setbreakpoints':
 				Object.keys(message.breakpoints).map(file => { 
-					Object.keys(message.breakpoints[file]).map(line => setBreakpoint(file, line));
+					Object.keys(message.breakpoints[file]).map(line => setBreakpoint(file, Number(line)) );
 				});
 				break;
 			default:

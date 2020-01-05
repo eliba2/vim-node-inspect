@@ -1,4 +1,3 @@
-let s:has_supported_python = 0
 let s:initiated = 0
 let s:plugin_path = expand('<sfile>:h:h')
 let s:channel = 0
@@ -9,6 +8,8 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 let s:signInitiated = 0
+let s:initialStop = 1
+let s:runOnStart = 0
 
 autocmd VimLeavePre * call OnNodeInspectExit()
 
@@ -45,7 +46,7 @@ func s:NodeInspectCleanup()
 endfunc
 
 function! s:NodeInspectToggleBreakpoint()
-	let file = expand('%:.')
+	let file = expand('%:p')
 	let line = line('.')
 	" might need to initialize the sings if called before the inspector is running
 	if s:signInitiated == 0
@@ -64,7 +65,7 @@ function! s:NodeInspectToggleBreakpoint()
 		call s:removeBrkptSign(bid, file)
 		" send event only if node-inspect was started
 		if s:initiated == 1
-			call s:sendEvent('{"m": "nd_removebrkpt", "file":' . file . ', "line":' . line . '}')
+			call s:sendEvent('{"m": "nd_removebrkpt", "file":"' . file . '", "line":' . line . '}')
 		endif
 	else
 		" add sign, store id
@@ -76,7 +77,7 @@ function! s:NodeInspectToggleBreakpoint()
 		let s:breakpoints[file][line] = bid
 		" send event only if node-inspect was started
 		if s:initiated == 1
-			call s:sendEvent('{"m": "nd_addbrkpt", "file":' . file . ', "line":' . line . '}')
+			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . file . '", "line":' . line . '}')
 		endif
 	endif
 endfunction
@@ -118,6 +119,16 @@ func s:onDebuggerStopped(mes)
 	execute "edit " . a:mes["file"]
 	execute ":" . a:mes["line"]
 	call s:addSign(a:mes["file"], a:mes["line"])
+	" send breakpoints, if any
+	if s:initialStop == 1
+		let s:initialStop = 0
+		call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
+		if s:runOnStart == 1
+			" not sleeping will send the events together
+			sleep 150m
+			call s:NodeInspectContinue()
+		endif
+	endif
 endfunc
 
 
@@ -145,17 +156,25 @@ function! s:SignInit()
     execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
 		" breakpoint sign
     execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
+		let s:signInitiated = 1
 	endif
 endfunction
 
 
 function! s:NodeInspectStart(start)
+	" must start with a file. at least for now.
+	if bufname() == ''
+		echom "node-inspect must start with a file. Save the buffer first"
+		return
+	endif
 	" register global on exit, add signs 
 	if s:initiated == 0
 		let s:initiated = 1
 		if s:signInitiated == 0
 			call s:SignInit()
 		endif
+		" wherever to start running
+		let s:runOnStart = a:start
 		" start
 		let s:start_win = win_getid()
 		let file = expand('%:p')
@@ -166,7 +185,8 @@ function! s:NodeInspectStart(start)
 		if has("nvim")
 			execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
 		else
-			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+			"execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
 		endif
 		" switch back to start buf
 		call win_gotoid(s:start_win)
@@ -180,8 +200,6 @@ function! s:NodeInspectStart(start)
 	else
 		call s:sendEvent('{"m": "nd_restart"}')
 	endif
-	" send breakpoints, if any
-	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
 endfunction
 
 

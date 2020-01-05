@@ -29,31 +29,24 @@ class NvimBridge {
 
 
 	createServer() {
-
 		return new Promise((resolve,reject) => {
-
-		// This server listens on a Unix socket at /var/run/mysocket
-		this.server = net.createServer((client) => {
-			// console.log('client connected');
-			// ipcClient = client;
-			this.client = client;
-			// I'll resolve only when a client connects
-			resolve();
-
-			// single client support at this time
-			this.client.on('data', (data) => {
-				// console.log('client says',data.toString(), typeof(data));
-				if (this.callback) {
-					let message = data.toString();
-					let json = JSON.parse(message);
-					this.callback(json);
-				}
+			// This server listens on a Unix socket at /var/run/mysocket
+			this.server = net.createServer((client) => {
+				this.client = client;
+				// I'll resolve only when a client connects
+				resolve();
+				// single client support at this time
+				this.client.on('data', (data) => {
+					//console.log('client says',data.toString(), typeof(data));
+					if (this.callback) {
+						let message = data.toString();
+						let json = JSON.parse(message);
+						this.callback(json);
+					}
+				});
 			});
-		});
-		this.server.listen(PORT, (c) => {
-		});
-
-
+			this.server.listen(PORT, (c) => {
+			});
 		});
 	}
 }
