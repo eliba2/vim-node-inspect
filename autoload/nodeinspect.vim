@@ -7,11 +7,13 @@ let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
-let s:signInitiated = 0
+let s:breakpointsUnhandledBuffers = {}
 let s:initialStop = 1
 let s:runOnStart = 0
+let s:configFile = '/tmp/breakpoints.vim'
 
 autocmd VimLeavePre * call OnNodeInspectExit()
+autocmd BufEnter * call OnBufEnter()
 
 func s:addBrkptSign(file, line)
 		let s:brkpt_sign_id = s:brkpt_sign_id + 1
@@ -40,41 +42,89 @@ func s:sendEvent(e)
 	endif
 endfunc
 
-func s:NodeInspectCleanup()
-	call s:removeSign()
-	let s:initiated = 0
+
+" write breakpoints file
+" it is serialized as a list of lines, each consist of
+" <file>#<line>,<line>...
+func s:saveConfigFile()
+	let breakpointList = []
+	for filename in keys(s:breakpoints)
+		let allLines = ''
+		for lineKey in keys(s:breakpoints[filename])
+			if allLines != ''
+				let allLines = allLines . ','
+			endif
+			let allLines = allLines . lineKey
+		endfor
+		let line = filename . '#' . allLines
+		call add(breakpointList, line)
+	endfor
+	call writefile(breakpointList, s:configFile)
 endfunc
+
+" load breakpoints file. see above for description.
+func s:loadConfigFile()
+	for fileLine in readfile(s:configFile, '')
+		let brkList = split(fileLine,"#")
+		let filename = brkList[0]
+		let allLines = split(brkList[1],',') 
+		" adding to breakpoint list but not yet setting the breakpoints signs.
+		" this will be done in the bufenter autocmd
+		for line in allLines
+			call s:addBreakpoint(filename, str2nr(line), 0)
+		endfor
+		let s:breakpointsUnhandledBuffers[filename] = 1
+	endfor
+	" call for initial buf to setup the breakpoints signs as its not auto called
+	call OnBufEnter()
+endfunc
+
+
+func s:NodeInspectCleanup()
+	let s:initiated = 0
+	call s:removeSign()
+	call s:saveConfigFile()
+endfunc
+
+
+
+" add brekpoint to list, adds the sign as well
+function s:addBreakpoint(file, line, signId)
+	if has_key(s:breakpoints, a:file) == 0
+		" does not exist, add it, file and line
+		let s:breakpoints[a:file] = {}
+	endif
+	let s:breakpoints[a:file][a:line] = a:signId
+endfunction
+
+
+function s:removeBreakpoint(file, line)
+	" its in, remove it
+	call remove(s:breakpoints[a:file], a:line)
+	" if the dictionary is empty, remove the file entirely
+	if len(s:breakpoints[a:file]) == 0
+		call remove(s:breakpoints, a:file)
+	endif
+endfunction
+
 
 function! s:NodeInspectToggleBreakpoint()
 	let file = expand('%:p')
 	let line = line('.')
-	" might need to initialize the sings if called before the inspector is running
-	if s:signInitiated == 0
-		call s:SignInit()
-	endif
 	" check if the file is in the directory and check for relevant line
 	if has_key(s:breakpoints, file) == 1 && has_key(s:breakpoints[file], line) == 1
-		let bid = s:breakpoints[file][line]
-		" its in, remove it
-		call remove(s:breakpoints[file], line)
-		" if the dictionary is empty, remove the file entirely
-		if len(s:breakpoints[file]) == 0
-			call remove(s:breakpoints, file)
-		endif
+		let signId = s:breakpoints[a:file][a:line]
+		call s:removeBreakpoint(file, line, signId)
 		" remove sign
-		call s:removeBrkptSign(bid, file)
+		call s:removeBrkptSign(a:signId, a:file)
 		" send event only if node-inspect was started
 		if s:initiated == 1
 			call s:sendEvent('{"m": "nd_removebrkpt", "file":"' . file . '", "line":' . line . '}')
 		endif
 	else
 		" add sign, store id
-		let bid =	s:addBrkptSign(file, line)
-		if has_key(s:breakpoints, file) == 0
-			" does not exist, add it, file and line
-			let s:breakpoints[file] = {}
-		endif
-		let s:breakpoints[file][line] = bid
+		let signId =	s:addBrkptSign(a:file, a:line)
+		call s:addBreakpoint(file, line, signId)
 		" send event only if node-inspect was started
 		if s:initiated == 1
 			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . file . '", "line":' . line . '}')
@@ -151,13 +201,10 @@ func OnNodeNvimMessage(channel, msg, name)
 endfunc
 
 function! s:SignInit()
-	if s:signInitiated == 0
-		" debug sign 
-    execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
-		" breakpoint sign
-    execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
-		let s:signInitiated = 1
-	endif
+	" debug sign 
+	execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
+	" breakpoint sign
+	execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
 endfunction
 
 
@@ -167,12 +214,10 @@ function! s:NodeInspectStart(start)
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
+
 	" register global on exit, add signs 
 	if s:initiated == 0
 		let s:initiated = 1
-		if s:signInitiated == 0
-			call s:SignInit()
-		endif
 		" wherever to start running
 		let s:runOnStart = a:start
 		" start
@@ -185,8 +230,7 @@ function! s:NodeInspectStart(start)
 		if has("nvim")
 			execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
 		else
-			"execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
-			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit'})"
+			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 		endif
 		" switch back to start buf
 		call win_gotoid(s:start_win)
@@ -203,12 +247,8 @@ function! s:NodeInspectStart(start)
 endfunction
 
 
-
-
 function! OnNodeInspectExit(...)
-	if s:initiated == 1
-		call s:NodeInspectCleanup()
-	endif
+	call s:NodeInspectCleanup()
 endfunction
 
 
@@ -216,15 +256,33 @@ function! OnNodeInspectNvimExit(...)
 	" close the window as there's no such option in termopen
 	call win_gotoid(s:repl_win)
 	execute "bd!"
-	if s:initiated == 1
-		call s:NodeInspectCleanup()
+	call s:NodeInspectCleanup()
+endfunction
+
+
+" when entering a buffer, display relevant breakpoints for this file
+function! OnBufEnter()
+	let filename = expand('%:p')
+	if has_key(s:breakpointsUnhandledBuffers, filename) == 1
+		" add relevant breakpoints signs
+		for lineKey in keys(s:breakpoints[filename])
+			" add sign override previous value
+			let signId =s:addBrkptSign(filename, lineKey)
+			call s:addBreakpoint(filename, lineKey, signId)
+		endfor
+		" its handled, remove it
+		unlet s:breakpointsUnhandledBuffers[filename]
 	endif
 endfunction
 
 
+function! nodeinspect#OnNodeInspectEnter()
+	call s:SignInit()
+	call s:loadConfigFile()
+endfunction
+
+
 " Callable functions
-
-
 function! nodeinspect#NodeInspectToggleBreakpoint()
 	call s:NodeInspectToggleBreakpoint()
 endfunction

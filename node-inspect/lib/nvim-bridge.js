@@ -30,7 +30,6 @@ class NvimBridge {
 
 	createServer() {
 		return new Promise((resolve,reject) => {
-			// This server listens on a Unix socket at /var/run/mysocket
 			this.server = net.createServer((client) => {
 				this.client = client;
 				// I'll resolve only when a client connects

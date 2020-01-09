@@ -18,3 +18,5 @@ command! -nargs=0 NodeInspectContinue call nodeinspect#NodeInspectContinue()
 command! -nargs=0 NodeInspectStop call nodeinspect#NodeInspectStop()
 command! -nargs=0 NodeInspectToggleBreakpoint call nodeinspect#NodeInspectToggleBreakpoint()
 
+"autocmd VimLeavePre * call OnNodeInspectExit()
+autocmd VimEnter * call nodeinspect#OnNodeInspectEnter()
