@@ -8,8 +8,6 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 let s:breakpointsUnhandledBuffers = {}
-let s:initialStop = 1
-let s:runOnStart = 0
 let s:configFile = '/tmp/breakpoints.vim'
 
 autocmd VimLeavePre * call OnNodeInspectExit()
@@ -113,17 +111,17 @@ function! s:NodeInspectToggleBreakpoint()
 	let line = line('.')
 	" check if the file is in the directory and check for relevant line
 	if has_key(s:breakpoints, file) == 1 && has_key(s:breakpoints[file], line) == 1
-		let signId = s:breakpoints[a:file][a:line]
+		let signId = s:breakpoints[file][line]
 		call s:removeBreakpoint(file, line, signId)
 		" remove sign
-		call s:removeBrkptSign(a:signId, a:file)
+		call s:removeBrkptSign(signId, file)
 		" send event only if node-inspect was started
 		if s:initiated == 1
 			call s:sendEvent('{"m": "nd_removebrkpt", "file":"' . file . '", "line":' . line . '}')
 		endif
 	else
 		" add sign, store id
-		let signId =	s:addBrkptSign(a:file, a:line)
+		let signId =	s:addBrkptSign(file, line)
 		call s:addBreakpoint(file, line, signId)
 		" send event only if node-inspect was started
 		if s:initiated == 1
@@ -169,16 +167,6 @@ func s:onDebuggerStopped(mes)
 	execute "edit " . a:mes["file"]
 	execute ":" . a:mes["line"]
 	call s:addSign(a:mes["file"], a:mes["line"])
-	" send breakpoints, if any
-	if s:initialStop == 1
-		let s:initialStop = 0
-		call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
-		if s:runOnStart == 1
-			" not sleeping will send the events together
-			sleep 150m
-			call s:NodeInspectContinue()
-		endif
-	endif
 endfunc
 
 
@@ -208,29 +196,36 @@ function! s:SignInit()
 endfunction
 
 
-function! s:NodeInspectStart(start)
+function! s:NodeInspectStart(start, tsap)
+
 	" must start with a file. at least for now.
-	if bufname() == ''
+	if bufname() == '' && a:tsap == ''
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
-
 	" register global on exit, add signs 
 	if s:initiated == 0
 		let s:initiated = 1
-		" wherever to start running
-		let s:runOnStart = a:start
 		" start
 		let s:start_win = win_getid()
-		let file = expand('%:p')
 		execute "bo 10new"
 		let s:repl_win = win_getid()
 		let s:repl_buf = bufnr('%')
 		set nonu
-		if has("nvim")
-			execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
+		" is it with a filename or connection to host:port?
+		if a:tsap == ''
+			let file = expand('%:p')
+			if has("nvim")
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
+			else
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+			endif
 		else
-			execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+			if has("nvim")
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectNvimExit'})"
+			else
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+			endif
 		endif
 		" switch back to start buf
 		call win_gotoid(s:start_win)
@@ -241,6 +236,15 @@ function! s:NodeInspectStart(start)
 			let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
 		endif
 		" to_do check return value from socket for failure
+
+		" send breakpoints, if any
+		sleep 150m
+		call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
+		if a:start == 1
+			" not sleeping will send the events together
+			sleep 150m
+			call s:NodeInspectContinue()
+		endif
 	else
 		call s:sendEvent('{"m": "nd_restart"}')
 	endif
@@ -280,6 +284,7 @@ function! nodeinspect#OnNodeInspectEnter()
 	call s:SignInit()
 	call s:loadConfigFile()
 endfunction
+
 
 
 " Callable functions
@@ -328,10 +333,19 @@ function! nodeinspect#NodeInspectStop()
 endfunction
 
 function! nodeinspect#NodeInspectStart()
-    call s:NodeInspectStart(0)
+    call s:NodeInspectStart(0, '')
 endfunction
 
 function! nodeinspect#NodeInspectStartRun()
-    call s:NodeInspectStart(1)
+    call s:NodeInspectStart(1, '')
 endfunction
+
+function! nodeinspect#NodeInspectConnect(tsap)
+	if s:initiated == 1
+		echo "close running instance first"
+		return
+	endif
+	call s:NodeInspectStart(0,a:tsap)
+endfunction
+
 

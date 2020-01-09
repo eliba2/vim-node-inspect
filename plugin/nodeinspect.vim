@@ -11,6 +11,7 @@ let nodeinspect_loaded = 1
 
 command! -nargs=0 NodeInspectStart call nodeinspect#NodeInspectStart()
 command! -nargs=0 NodeInspectStartRun call nodeinspect#NodeInspectStartRun()
+command! -nargs=1 NodeInspectConnect call nodeinspect#NodeInspectConnect(<args>)
 command! -nargs=0 NodeInspectStepOver call nodeinspect#NodeInspectStepOver()
 command! -nargs=0 NodeInspectStepInto call nodeinspect#NodeInspectStepInto()
 command! -nargs=0 NodeInspectStepOut call nodeinspect#NodeInspectStepOut()

@@ -172,8 +172,6 @@ class NodeInspector {
       this[domain] = createAgentProxy(domain, this.client);
     });
     this.handleDebugEvent = (fullName, params) => {
-			//console.log("======");
-			//console.log(fullName);
       const [domain, name] = fullName.split('.');
       if (domain in this) {
         this[domain].emit(name, params);

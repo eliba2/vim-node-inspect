@@ -16,6 +16,8 @@ NodeInspectStart - Starts node inspect, paused, in a bottom shell
 
 NodeInspectStartRun - Starts node inspect and starts running immediatly
 
+NodeInspectConnect host:port - Connect to a running instance
+
 NodeInspectStepOver - Step over
 
 NodeInspectStepInto - Step into
