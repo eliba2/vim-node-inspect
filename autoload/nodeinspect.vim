@@ -210,13 +210,16 @@ function! s:NodeInspectStart(start, tsap)
 		let s:initiated = 1
 		" start
 		let s:start_win = win_getid()
+		if a:tsap == ''
+			let file = expand('%:p')
+		endif
+		" create bottom buffer, switch to it
 		execute "bo 10new"
 		let s:repl_win = win_getid()
 		let s:repl_buf = bufnr('%')
 		set nonu
 		" is it with a filename or connection to host:port?
 		if a:tsap == ''
-			let file = expand('%:p')
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
 			else
