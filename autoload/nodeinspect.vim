@@ -144,10 +144,8 @@ endfunction
 
 
 function! s:NodeInspectStop()
-	call s:sendEvent('{"m": "nd_kill"}')
 	call s:removeSign()
-  call s:NodeInspectCleanup()
-	execute s:repl_buf . "bd!"
+	call s:sendEvent('{"m": "nd_kill"}')
 endfunction
 
 
@@ -177,14 +175,15 @@ endfunc
 
 func OnNodeMessage(channel, msg)
 	if len(a:msg) == 0 || len(a:msg) == 1 &&  len(a:msg[0]) == 0
+		" currently ignoring; called at the end (nvim)
 		let mes = ''
 	else
 		let mes = json_decode(a:msg)
-	endif
-	if mes["m"] == "nd_stopped"
-		call s:onDebuggerStopped(mes)
-	else
-		echo "vim-node-inspect: unknown message"
+		if mes["m"] == "nd_stopped"
+			call s:onDebuggerStopped(mes)
+		else
+			echo "vim-node-inspect: unknown message "
+		endif
 	endif
 endfunc
 
