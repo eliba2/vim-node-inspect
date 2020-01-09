@@ -8,7 +8,7 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 let s:breakpointsUnhandledBuffers = {}
-let s:configFile = '/tmp/breakpoints.vim'
+let s:configFile = s:plugin_path . '/breakpoints'
 
 autocmd VimLeavePre * call OnNodeInspectExit()
 autocmd BufEnter * call OnBufEnter()
@@ -62,19 +62,21 @@ endfunc
 
 " load breakpoints file. see above for description.
 func s:loadConfigFile()
-	for fileLine in readfile(s:configFile, '')
-		let brkList = split(fileLine,"#")
-		let filename = brkList[0]
-		let allLines = split(brkList[1],',') 
-		" adding to breakpoint list but not yet setting the breakpoints signs.
-		" this will be done in the bufenter autocmd
-		for line in allLines
-			call s:addBreakpoint(filename, str2nr(line), 0)
+	if filereadable(s:configFile)
+		for fileLine in readfile(s:configFile, '')
+			let brkList = split(fileLine,"#")
+			let filename = brkList[0]
+			let allLines = split(brkList[1],',') 
+			" adding to breakpoint list but not yet setting the breakpoints signs.
+			" this will be done in the bufenter autocmd
+			for line in allLines
+				call s:addBreakpoint(filename, str2nr(line), 0)
+			endfor
+			let s:breakpointsUnhandledBuffers[filename] = 1
 		endfor
-		let s:breakpointsUnhandledBuffers[filename] = 1
-	endfor
-	" call for initial buf to setup the breakpoints signs as its not auto called
-	call OnBufEnter()
+		" call for initial buf to setup the breakpoints signs as its not auto called
+		call OnBufEnter()
+	endif
 endfunc
 
 
