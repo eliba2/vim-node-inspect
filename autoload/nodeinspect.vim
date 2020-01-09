@@ -165,10 +165,13 @@ endfunction
 
 
 func s:onDebuggerStopped(mes)
-	call win_gotoid(s:start_win)
-	execute "edit " . a:mes["file"]
-	execute ":" . a:mes["line"]
-	call s:addSign(a:mes["file"], a:mes["line"])
+	" open the relevant file only if it can be found locally
+	if filereadable(a:mes["file"])
+		call win_gotoid(s:start_win)
+		execute "edit " . a:mes["file"]
+		execute ":" . a:mes["line"]
+		call s:addSign(a:mes["file"], a:mes["line"])
+	endif
 endfunc
 
 
