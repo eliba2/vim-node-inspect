@@ -199,14 +199,11 @@ endfunction
 
 " node exiting callback (vim)
 function! OnNodeInspectExit(...)
-	call s:NodeInspectCleanup()
-endfunction
-
-" node exiting callback (nvim)
-function! OnNodeInspectNvimExit(...)
-	" close the window as there's no such option in termopen
-	call win_gotoid(s:repl_win)
-	execute "bd!"
+	" make sure the win is closed (in case of stopped buffer)
+	" in nvim there's no such option at all (close the window when closed)
+	if win_gotoid(s:repl_win) == 1
+		execute "bd!"
+	endif
 	call s:NodeInspectCleanup()
 endfunction
 
@@ -287,13 +284,13 @@ function! s:NodeInspectStart(start, tsap)
 		" is it with a filename or connection to host:port?
 		if a:tsap == ''
 			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
 				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 			endif
 		else
 			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectNvimExit'})"
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
 				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 			endif
