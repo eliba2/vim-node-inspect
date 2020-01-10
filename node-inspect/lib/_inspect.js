@@ -357,7 +357,6 @@ async function startInspect(argv = process.argv.slice(2),
   stdin.resume();
 
   function handleUnexpectedError(e) {
-		console.log("==>>err",e);
     if (!(e instanceof StartupError)) {
       console.error('There was an internal error in node-inspect. ' +
                     'Please report this bug.');

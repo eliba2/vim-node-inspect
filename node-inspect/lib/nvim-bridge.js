@@ -19,7 +19,7 @@ class NvimBridge {
 			this.client.write(JSON.stringify(msg));
 		}
 		else {
-			console.error("can't send event, vim object not setup");
+			console.error("can't send event, vim object not set up");
 		}
 	}
 

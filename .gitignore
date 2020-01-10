@@ -1,0 +1,5 @@
+# breakpoints settings file
+breakpoints
+
+# Sometimes I'm on Mac
+.DS_Store

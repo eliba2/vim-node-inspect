@@ -8,7 +8,7 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 let s:breakpointsUnhandledBuffers = {}
-let s:configFile = '/tmp/breakpoints.vim'
+let s:configFile = s:plugin_path . '/breakpoints'
 
 autocmd VimLeavePre * call OnNodeInspectExit()
 autocmd BufEnter * call OnBufEnter()
@@ -62,19 +62,21 @@ endfunc
 
 " load breakpoints file. see above for description.
 func s:loadConfigFile()
-	for fileLine in readfile(s:configFile, '')
-		let brkList = split(fileLine,"#")
-		let filename = brkList[0]
-		let allLines = split(brkList[1],',') 
-		" adding to breakpoint list but not yet setting the breakpoints signs.
-		" this will be done in the bufenter autocmd
-		for line in allLines
-			call s:addBreakpoint(filename, str2nr(line), 0)
+	if filereadable(s:configFile)
+		for fileLine in readfile(s:configFile, '')
+			let brkList = split(fileLine,"#")
+			let filename = brkList[0]
+			let allLines = split(brkList[1],',') 
+			" adding to breakpoint list but not yet setting the breakpoints signs.
+			" this will be done in the bufenter autocmd
+			for line in allLines
+				call s:addBreakpoint(filename, str2nr(line), 0)
+			endfor
+			let s:breakpointsUnhandledBuffers[filename] = 1
 		endfor
-		let s:breakpointsUnhandledBuffers[filename] = 1
-	endfor
-	" call for initial buf to setup the breakpoints signs as its not auto called
-	call OnBufEnter()
+		" call for initial buf to setup the breakpoints signs as its not auto called
+		call OnBufEnter()
+	endif
 endfunc
 
 
@@ -154,10 +156,8 @@ endfunction
 
 
 function! s:NodeInspectStop()
-	call s:sendEvent('{"m": "nd_kill"}')
 	call s:removeSign()
-  call s:NodeInspectCleanup()
-	execute s:repl_buf . "bd!"
+	call s:sendEvent('{"m": "nd_kill"}')
 endfunction
 
 
@@ -175,23 +175,27 @@ endfunction
 
 
 func s:onDebuggerStopped(mes)
-	call win_gotoid(s:start_win)
-	execute "edit " . a:mes["file"]
-	execute ":" . a:mes["line"]
-	call s:addSign(a:mes["file"], a:mes["line"])
+	" open the relevant file only if it can be found locally
+	if filereadable(a:mes["file"])
+		call win_gotoid(s:start_win)
+		execute "edit " . a:mes["file"]
+		execute ":" . a:mes["line"]
+		call s:addSign(a:mes["file"], a:mes["line"])
+	endif
 endfunc
 
 
 func OnNodeMessage(channel, msg)
 	if len(a:msg) == 0 || len(a:msg) == 1 &&  len(a:msg[0]) == 0
+		" currently ignoring; called at the end (nvim)
 		let mes = ''
 	else
 		let mes = json_decode(a:msg)
-	endif
-	if mes["m"] == "nd_stopped"
-		call s:onDebuggerStopped(mes)
-	else
-		echo "vim-node-inspect: unknown message"
+		if mes["m"] == "nd_stopped"
+			call s:onDebuggerStopped(mes)
+		else
+			echo "vim-node-inspect: unknown message "
+		endif
 	endif
 endfunc
 
@@ -220,13 +224,16 @@ function! s:NodeInspectStart(start, tsap)
 		let s:initiated = 1
 		" start
 		let s:start_win = win_getid()
+		if a:tsap == ''
+			let file = expand('%:p')
+		endif
+		" create bottom buffer, switch to it
 		execute "bo 10new"
 		let s:repl_win = win_getid()
 		let s:repl_buf = bufnr('%')
 		set nonu
 		" is it with a filename or connection to host:port?
 		if a:tsap == ''
-			let file = expand('%:p')
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectNvimExit'})"
 			else
