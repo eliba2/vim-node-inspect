@@ -13,38 +13,48 @@ let s:configFile = s:plugin_path . '/breakpoints'
 autocmd VimLeavePre * call OnNodeInspectExit()
 autocmd BufEnter * call OnBufEnter()
 
-func s:addBrkptSign(file, line)
+" utility functions to add signs
+function! s:addBrkptSign(file, line)
 		let s:brkpt_sign_id = s:brkpt_sign_id + 1
 		execute("sign place " . s:brkpt_sign_id . " line=" . a:line . " name=" . s:sign_brkpt . " group=" . s:sign_group . " file=" . a:file)
     return s:brkpt_sign_id
-endfunc
+endfunction
 
-func s:removeBrkptSign(id, file)
+function! s:removeBrkptSign(id, file)
     execute("sign unplace " . a:id . " group=" . s:sign_group . " file=" . a:file)
-endfunc
+endfunction
 
-func s:addSign(file, line)
+function! s:addSign(file, line)
     execute("sign place " . s:sign_id . " line=" . a:line . " name=" . s:sign_cur_exec . " group=" . s:sign_group .  " file=" . a:file)
-endfunc
+endfunction
 
-func s:removeSign()
+function! s:removeSign()
     execute "sign unplace " . s:sign_id . " group=" . s:sign_group
-endfunc
+endfunction
 
+function! s:SignInit()
+	" debug sign 
+	execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
+	" breakpoint sign
+	execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
+endfunction
 
-func s:sendEvent(e)
+" send event to node bridge
+function! s:sendEvent(e)
 	if has("nvim")
 		call chansend(s:channel, a:e)
 	else
 		call ch_sendraw(s:channel, a:e)
 	endif
-endfunc
+endfunction
 
 
-" write breakpoints file
+
+
+" write configuration (breakpoints) file
 " it is serialized as a list of lines, each consist of
 " <file>#<line>,<line>...
-func s:saveConfigFile()
+function! s:saveConfigFile()
 	let breakpointList = []
 	for filename in keys(s:breakpoints)
 		let allLines = ''
@@ -58,10 +68,10 @@ func s:saveConfigFile()
 		call add(breakpointList, line)
 	endfor
 	call writefile(breakpointList, s:configFile)
-endfunc
+endfunction
 
 " load breakpoints file. see above for description.
-func s:loadConfigFile()
+function! s:loadConfigFile()
 	if filereadable(s:configFile)
 		for fileLine in readfile(s:configFile, '')
 			let brkList = split(fileLine,"#")
@@ -77,19 +87,22 @@ func s:loadConfigFile()
 		" call for initial buf to setup the breakpoints signs as its not auto called
 		call OnBufEnter()
 	endif
-endfunc
+endfunction
 
 
-func s:NodeInspectCleanup()
+" called on removal of the node bridge.
+function! s:NodeInspectCleanup()
 	let s:initiated = 0
 	call s:removeSign()
 	call s:saveConfigFile()
-endfunc
+endfunction
 
 
 
-" add brekpoint to list, adds the sign as well
-function s:addBreakpoint(file, line, signId)
+
+
+" add a brekpoint to list
+function! s:addBreakpoint(file, line, signId)
 	if has_key(s:breakpoints, a:file) == 0
 		" does not exist, add it, file and line
 		let s:breakpoints[a:file] = {}
@@ -97,8 +110,8 @@ function s:addBreakpoint(file, line, signId)
 	let s:breakpoints[a:file][a:line] = a:signId
 endfunction
 
-
-function s:removeBreakpoint(file, line)
+" remove a breakpoint from the list.
+function! s:removeBreakpoint(file, line)
 	" its in, remove it
 	call remove(s:breakpoints[a:file], a:line)
 	" if the dictionary is empty, remove the file entirely
@@ -107,11 +120,15 @@ function s:removeBreakpoint(file, line)
 	endif
 endfunction
 
-
+" remove all breakpoints. removes the signs is any
 function! s:NodeInspectRemoveAllBreakpoints()
 	for filename in keys(s:breakpoints)
 		for line in keys(s:breakpoints[filename])
+			let signId = s:breakpoints[filename][line]
 			call s:removeBreakpoint(filename, line)
+			if signId != 0
+				call s:removeBrkptSign(signId, filename)
+			endif
 		endfor
 	endfor
 	if s:initiated == 1
@@ -119,14 +136,15 @@ function! s:NodeInspectRemoveAllBreakpoints()
 	endif
 endfunction
 
-
+" toggle a breakpoint. handles signs as well.
 function! s:NodeInspectToggleBreakpoint()
 	let file = expand('%:p')
 	let line = line('.')
 	" check if the file is in the directory and check for relevant line
 	if has_key(s:breakpoints, file) == 1 && has_key(s:breakpoints[file], line) == 1
 		let signId = s:breakpoints[file][line]
-		call s:removeBreakpoint(file, line, signId)
+		echom "remove ".file." ".line. " ".signId
+		call s:removeBreakpoint(file, line)
 		" remove sign
 		call s:removeBrkptSign(signId, file)
 		" send event only if node-inspect was started
@@ -144,37 +162,12 @@ function! s:NodeInspectToggleBreakpoint()
 	endif
 endfunction
 
-function! s:NodeInspectStepOver()
-	call s:removeSign()
-	call s:sendEvent('{"m": "nd_next"}')
-endfunction
-
-function! s:NodeInspectStepInto()
-	call s:removeSign()
-	call s:sendEvent('{"m": "nd_into"}')
-endfunction
-
-
-function! s:NodeInspectStop()
-	call s:removeSign()
-	call s:sendEvent('{"m": "nd_kill"}')
-endfunction
-
-
-function! s:NodeInspectContinue()
-	call s:removeSign()
-	call s:sendEvent('{"m": "nd_continue"}')
-endfunction
-
-
-function! s:NodeInspectStepOut()
-	call s:removeSign()
-	call s:sendEvent('{"m": "nd_out"}')
-endfunction
 
 
 
-func s:onDebuggerStopped(mes)
+
+" called when the debuggger was stopped. settings signs and position
+function! s:onDebuggerStopped(mes)
 	" open the relevant file only if it can be found locally
 	if filereadable(a:mes["file"])
 		call win_gotoid(s:start_win)
@@ -182,10 +175,10 @@ func s:onDebuggerStopped(mes)
 		execute ":" . a:mes["line"]
 		call s:addSign(a:mes["file"], a:mes["line"])
 	endif
-endfunc
+endfunction
 
-
-func OnNodeMessage(channel, msg)
+" on receiving a message from the node bridge
+function! OnNodeMessage(channel, msg)
 	if len(a:msg) == 0 || len(a:msg) == 1 &&  len(a:msg[0]) == 0
 		" currently ignoring; called at the end (nvim)
 		let mes = ''
@@ -197,23 +190,82 @@ func OnNodeMessage(channel, msg)
 			echo "vim-node-inspect: unknown message "
 		endif
 	endif
-endfunc
+endfunction
 
-
-func OnNodeNvimMessage(channel, msg, name)
+" on receiving a message from the node bridge (nvim)
+function! OnNodeNvimMessage(channel, msg, name)
 	call OnNodeMessage(a:channel, a:msg)
-endfunc
+endfunction
 
-function! s:SignInit()
-	" debug sign 
-	execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
-	" breakpoint sign
-	execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
+" node exiting callback (vim)
+function! OnNodeInspectExit(...)
+	call s:NodeInspectCleanup()
+endfunction
+
+" node exiting callback (nvim)
+function! OnNodeInspectNvimExit(...)
+	" close the window as there's no such option in termopen
+	call win_gotoid(s:repl_win)
+	execute "bd!"
+	call s:NodeInspectCleanup()
+endfunction
+
+" when entering a buffer, display relevant breakpoints for this file
+function! OnBufEnter()
+	let filename = expand('%:p')
+	if has_key(s:breakpointsUnhandledBuffers, filename) == 1
+		" add relevant breakpoints signs
+		for lineKey in keys(s:breakpoints[filename])
+			" add sign override previous value
+			let signId =s:addBrkptSign(filename, lineKey)
+			call s:addBreakpoint(filename, lineKey, signId)
+		endfor
+		" its handled, remove it
+		unlet s:breakpointsUnhandledBuffers[filename]
+	endif
+endfunction
+
+" called upon startup, setting signs if any.
+function! nodeinspect#OnNodeInspectEnter()
+	call s:SignInit()
+	call s:loadConfigFile()
 endfunction
 
 
-function! s:NodeInspectStart(start, tsap)
 
+
+" step over
+function! s:NodeInspectStepOver()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_next"}')
+endfunction
+
+" step into
+function! s:NodeInspectStepInto()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_into"}')
+endfunction
+
+" stop, kills node
+function! s:NodeInspectStop()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_kill"}')
+endfunction
+
+" run (continue)
+function! s:NodeInspectRun()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_continue"}')
+endfunction
+
+" step out
+function! s:NodeInspectStepOut()
+	call s:removeSign()
+	call s:sendEvent('{"m": "nd_out"}')
+endfunction
+
+" starts node-inspect. connects to the node bridge.
+function! s:NodeInspectStart(start, tsap)
 	" must start with a file. at least for now.
 	if bufname() == '' && a:tsap == ''
 		echom "node-inspect must start with a file. Save the buffer first"
@@ -255,14 +307,13 @@ function! s:NodeInspectStart(start, tsap)
 			let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
 		endif
 		" to_do check return value from socket for failure
-
 		" send breakpoints, if any
 		sleep 150m
 		call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(s:breakpoints) . '}')
 		if a:start == 1
 			" not sleeping will send the events together
 			sleep 150m
-			call s:NodeInspectContinue()
+			call s:NodeInspectRun()
 		endif
 	else
 		call s:sendEvent('{"m": "nd_restart"}')
@@ -270,43 +321,8 @@ function! s:NodeInspectStart(start, tsap)
 endfunction
 
 
-function! OnNodeInspectExit(...)
-	call s:NodeInspectCleanup()
-endfunction
 
-
-function! OnNodeInspectNvimExit(...)
-	" close the window as there's no such option in termopen
-	call win_gotoid(s:repl_win)
-	execute "bd!"
-	call s:NodeInspectCleanup()
-endfunction
-
-
-" when entering a buffer, display relevant breakpoints for this file
-function! OnBufEnter()
-	let filename = expand('%:p')
-	if has_key(s:breakpointsUnhandledBuffers, filename) == 1
-		" add relevant breakpoints signs
-		for lineKey in keys(s:breakpoints[filename])
-			" add sign override previous value
-			let signId =s:addBrkptSign(filename, lineKey)
-			call s:addBreakpoint(filename, lineKey, signId)
-		endfor
-		" its handled, remove it
-		unlet s:breakpointsUnhandledBuffers[filename]
-	endif
-endfunction
-
-
-function! nodeinspect#OnNodeInspectEnter()
-	call s:SignInit()
-	call s:loadConfigFile()
-endfunction
-
-
-
-" Callable functions
+" Callable functions / plugin API
 function! nodeinspect#NodeInspectToggleBreakpoint()
 	call s:NodeInspectToggleBreakpoint()
 endfunction
@@ -339,12 +355,12 @@ function! nodeinspect#NodeInspectStepOut()
 	call s:NodeInspectStepOut()
 endfunction
 
-function! nodeinspect#NodeInspectContinue()
+function! nodeinspect#NodeInspectRun()
 	if s:initiated == 0
-		echo "node-inspect not started"
-		return
+    call s:NodeInspectStart(1, '')
+	else
+		call s:NodeInspectRun()
 	endif
-	call s:NodeInspectContinue()
 endfunction
 
 function! nodeinspect#NodeInspectStop()
@@ -359,10 +375,6 @@ function! nodeinspect#NodeInspectStart()
     call s:NodeInspectStart(0, '')
 endfunction
 
-function! nodeinspect#NodeInspectStartRun()
-    call s:NodeInspectStart(1, '')
-endfunction
-
 function! nodeinspect#NodeInspectConnect(tsap)
 	if s:initiated == 1
 		echo "close running instance first"
@@ -370,5 +382,4 @@ function! nodeinspect#NodeInspectConnect(tsap)
 	endif
 	call s:NodeInspectStart(0,a:tsap)
 endfunction
-
 

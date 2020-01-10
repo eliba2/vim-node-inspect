@@ -289,7 +289,8 @@ class NodeInspector {
 
 function parseArgv([target, ...args]) {
   let host = '127.0.0.1';
-  let port = 9229;
+  //let port = 9229;
+  let port = 9239;
   let isRemote = false;
   let script = target;
   let scriptArgs = args;
