@@ -2,6 +2,7 @@ let s:initiated = 0
 let s:plugin_path = expand('<sfile>:h:h')
 let s:channel = 0
 let s:sign_id = 2
+let s:repl_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -132,7 +133,7 @@ function! s:NodeInspectRemoveAllBreakpoints()
 		endfor
 	endfor
 	if s:initiated == 1
-		call s:sendEvent('{"m": "nd_removeallbrkpts"}')
+		call s:sendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(s:breakpoints) . '}')
 	endif
 endfunction
 
@@ -143,7 +144,6 @@ function! s:NodeInspectToggleBreakpoint()
 	" check if the file is in the directory and check for relevant line
 	if has_key(s:breakpoints, file) == 1 && has_key(s:breakpoints[file], line) == 1
 		let signId = s:breakpoints[file][line]
-		echom "remove ".file." ".line. " ".signId
 		call s:removeBreakpoint(file, line)
 		" remove sign
 		call s:removeBrkptSign(signId, file)
@@ -199,20 +199,19 @@ endfunction
 
 " vim global exit handler
 function! OnVimLeavePre(...)
-	" close the bridge gracefully. on newer vim I could use the term_setkill,
-	" but its not supported on 8/nvim.
+	" close the bridge gracefully in any case its still running
 	if s:initiated == 1
 		call s:sendEvent('{"m": "nd_kill"}')
 		sleep 150m
 	endif
-	call s:OnNodeInspectExit()
+	call OnNodeInspectExit()
 endfunction
 
 " node exiting callback (vim)
 function! OnNodeInspectExit(...)
 	" make sure the win is closed (in case of stopped buffer)
 	" in nvim there's no such option at all (close the window when closed)
-	if win_gotoid(s:repl_win) == 1
+	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
 		execute "bd!"
 	endif
 	call s:NodeInspectCleanup()
@@ -297,13 +296,13 @@ function! s:NodeInspectStart(start, tsap)
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		else
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		endif
 

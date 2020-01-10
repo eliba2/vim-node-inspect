@@ -8,7 +8,7 @@ Wraps node-inspect (https://github.com/nodejs/node-inspect). An interactive node
 [![asciicast](https://asciinema.org/a/292793.svg)](https://asciinema.org/a/292793)
 
 ## Requirements
-Vim8/Neovim.
+Vim8.1/Neovim.
 
 ## Installation
 Install with your favorite package manager. For vim-plug its

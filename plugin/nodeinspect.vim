@@ -7,6 +7,12 @@
 if exists('nodeinspect_loaded')
     finish
 endif
+if has("nvim") == 0 && v:version < 801
+   echohl WarningMsg
+   echom  "vim-node-inspect requires vim 8.1"
+   echohl None
+   finish
+endif
 let nodeinspect_loaded = 1
 
 command! -nargs=0 NodeInspectStart call nodeinspect#NodeInspectStart()
