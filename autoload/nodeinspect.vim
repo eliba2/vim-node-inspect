@@ -10,7 +10,7 @@ let s:breakpoints = {}
 let s:breakpointsUnhandledBuffers = {}
 let s:configFile = s:plugin_path . '/breakpoints'
 
-autocmd VimLeavePre * call OnNodeInspectExit()
+autocmd VimLeavePre * call OnVimLeavePre()
 autocmd BufEnter * call OnBufEnter()
 
 " utility functions to add signs
@@ -197,6 +197,17 @@ function! OnNodeNvimMessage(channel, msg, name)
 	call OnNodeMessage(a:channel, a:msg)
 endfunction
 
+" vim global exit handler
+function! OnVimLeavePre(...)
+	" close the bridge gracefully. on newer vim I could use the term_setkill,
+	" but its not supported on 8/nvim.
+	if s:initiated == 1
+		call s:sendEvent('{"m": "nd_kill"}')
+		sleep 150m
+	endif
+	call s:OnNodeInspectExit()
+endfunction
+
 " node exiting callback (vim)
 function! OnNodeInspectExit(...)
 	" make sure the win is closed (in case of stopped buffer)
@@ -286,15 +297,16 @@ function! s:NodeInspectStart(start, tsap)
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 			endif
 		else
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'term_kill': 'kill',  'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close'})"
 			endif
 		endif
+
 		" switch back to start buf
 		call win_gotoid(s:start_win)
 		sleep 150m
