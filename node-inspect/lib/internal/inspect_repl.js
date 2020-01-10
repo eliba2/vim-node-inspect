@@ -640,7 +640,8 @@ function createRepl(inspector, nvim_bridge_p) {
       if (actualLocation && actualLocation.scriptId) {
         if (!silent) return '';// getSourceSnippet(actualLocation, 5);
       } else {
-        print(`Warning: script '${script}' was not loaded yet.`);
+				// skip for vim
+        //print(`Warning: script '${script}' was not loaded yet.`);
       }
       return undefined;
     }
@@ -1096,6 +1097,11 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_removebrkpt':
 				clearBreakpoint(message.file, message.line);	
+				break;
+			case 'nd_removeallbrkpts':
+				Object.keys(message.breakpoints).map(file => { 
+					Object.keys(message.breakpoints[file]).map(line => clearBreakpoint(file, Number(line)) );
+				});
 				break;
 			case 'nd_setbreakpoints':
 				Object.keys(message.breakpoints).map(file => { 

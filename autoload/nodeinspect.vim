@@ -106,6 +106,18 @@ function s:removeBreakpoint(file, line)
 endfunction
 
 
+function! s:NodeInspectRemoveAllBreakpoints()
+	for filename in keys(s:breakpoints)
+		for line in keys(s:breakpoints[filename])
+			call s:removeBreakpoint(filename, line)
+		endfor
+	endfor
+	if s:initiated == 1
+		call s:sendEvent('{"m": "nd_removeallbrkpts"}')
+	endif
+endfunction
+
+
 function! s:NodeInspectToggleBreakpoint()
 	let file = expand('%:p')
 	let line = line('.')
@@ -290,6 +302,10 @@ endfunction
 " Callable functions
 function! nodeinspect#NodeInspectToggleBreakpoint()
 	call s:NodeInspectToggleBreakpoint()
+endfunction
+
+function! nodeinspect#NodeInspectRemoveAllBreakpoints()
+	call s:NodeInspectRemoveAllBreakpoints()
 endfunction
 
 function! nodeinspect#NodeInspectStepOver()
