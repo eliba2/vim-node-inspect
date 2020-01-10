@@ -264,7 +264,7 @@ endfunction
 " starts node-inspect. connects to the node bridge.
 function! s:NodeInspectStart(start, tsap)
 	" must start with a file. at least for now.
-	if bufname() == '' && a:tsap == ''
+	if bufname('') == '' && a:tsap == ''
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
