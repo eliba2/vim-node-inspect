@@ -92,9 +92,20 @@ function isNativeUrl(url) {
 
 function getRelativePath(filenameOrURL) {
   const dir = Path.join(Path.resolve(), 'x').slice(0, -1);
+	var filename;
 
-  const filename = filenameOrURL.startsWith('file://') ?
-    fileURLToPath(filenameOrURL) : filenameOrURL;
+	if (filenameOrURL.startsWith('file://')) {
+
+		filename = filenameOrURL;
+		try {
+			filename = fileURLToPath(filenameOrURL);
+		} catch(e) {
+			// fileURLToPath added in Node 10+
+			filename = filenameOrURL[7] === '/' ? filenameOrURL.substring(8) : filenameOrURL.substring(7);
+		}
+	}
+	else
+		filename = filenameOrURL;
 
   // Change path to relative, if possible
   if (filename.indexOf(dir) === 0) {
@@ -467,6 +478,24 @@ function createRepl(inspector, nvim_bridge_p) {
       }).join('\n');
     }
 
+		// for vim-node-inspect
+		static getList(callFrames) {
+      return callFrames.map((callFrame, idx) => {
+        const {
+          location: { scriptId, lineNumber, columnNumber },
+          functionName
+        } = callFrame;
+        const name = functionName || '(anonymous)';
+
+        const script = knownScripts[scriptId];
+        const relativeUrl =
+          (script && getRelativePath(script.url)) || '<unknown>';
+        const frameLocation =
+          `${relativeUrl}:${lineNumber + 1}:${columnNumber}`;
+        return {name, frameLocation};
+			}).reverse();
+		}
+
     static from(callFrames) {
       return super.from(Array.from(callFrames).map((callFrame) => {
         if (callFrame instanceof CallFrame) {
@@ -789,7 +818,7 @@ function createRepl(inspector, nvim_bridge_p) {
 
     const header = `${breakType} in ${scriptUrl}:${lineNumber + 1}`;
 		/* notify nvim */
-		let m = { m: 'nd_stopped', file: scriptUrl, line: lineNumber + 1};
+		let m = { m: 'nd_stopped', file: scriptUrl, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};
 		nvim_bridge.send(m);
 
     inspector.suspendReplWhile(() =>
