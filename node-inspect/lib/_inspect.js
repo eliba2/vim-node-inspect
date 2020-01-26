@@ -165,7 +165,7 @@ class NodeInspector {
           () => Promise.resolve([null, options.port, options.host]);
     }
 
-    this.client = new InspectClient();
+    this.client = new InspectClient(nvim_bridge);
 
     this.domainNames = ['Debugger', 'HeapProfiler', 'Profiler', 'Runtime'];
     this.domainNames.forEach((domain) => {

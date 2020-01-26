@@ -28,6 +28,13 @@ class NvimBridge {
 	}
 
 
+	sendInternalEvent(msg) {
+		if (this.callback) {
+			this.callback(msg);
+		}
+	}
+
+
 	createServer() {
 		return new Promise((resolve,reject) => {
 			this.server = net.createServer((client) => {

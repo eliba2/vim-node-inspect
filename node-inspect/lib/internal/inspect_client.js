@@ -164,14 +164,14 @@ function decodeFrameHybi17(data) {
 }
 
 class Client extends EventEmitter {
-  constructor(/*nvim_bridge*/) {
+  constructor(nvim_bridge) {
     super();
     this.handleChunk = this._handleChunk.bind(this);
 
     this._port = undefined;
     this._host = undefined;
 
-		//this.nvim_bridge = nvim_bridge;
+		this.nvim_bridge = nvim_bridge;
 
     this.reset();
   }
@@ -237,6 +237,11 @@ class Client extends EventEmitter {
   callMethod(method, params) {
     return new Promise((resolve, reject) => {
       if (!this._socket) {
+				// failed. inform vim to user message
+				let vimMessage = { m: 'nd_sockerror' };
+				this.nvim_bridge.send(vimMessage);
+				let internalMessage = { m: 'nd_kill' };
+				this.nvim_bridge.sendInternalEvent(internalMessage);
         reject(new Error('Use `run` to start the app again.'));
         return;
       }

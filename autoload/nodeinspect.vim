@@ -260,6 +260,8 @@ function! OnNodeMessage(channel, msg)
 		let mes = json_decode(a:msg)
 		if mes["m"] == "nd_stopped"
 			call s:onDebuggerStopped(mes)
+		elseif mes["m"] == "nd_sockerror"
+			echom "vim-node-inspect: failed to connect to remote host"
 		else
 			echo "vim-node-inspect: unknown message "
 		endif
