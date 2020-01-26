@@ -228,7 +228,14 @@ function! s:NodeInspectToggleBreakpoint()
 endfunction
 
 
-
+" empty the backtrace window, adds a 'debugger not stopped' window
+function! s:clearBacktraceWindow()
+	let cur_win = win_getid()
+	call win_gotoid(s:backtrace_win)
+	execute "%d"
+	call setline('.', 'Debugger not stopped')
+	call win_gotoid(cur_win)
+endfunction
 
 
 " called when the debuggger was stopped. settings signs and position
@@ -323,30 +330,35 @@ endfunction
 " step over
 function! s:NodeInspectStepOver()
 	call s:removeSign()
+	call s:clearBacktraceWindow()
 	call s:sendEvent('{"m": "nd_next"}')
 endfunction
 
 " step into
 function! s:NodeInspectStepInto()
 	call s:removeSign()
+	call s:clearBacktraceWindow()
 	call s:sendEvent('{"m": "nd_into"}')
 endfunction
 
 " stop, kills node
 function! s:NodeInspectStop()
 	call s:removeSign()
+	call s:clearBacktraceWindow()
 	call s:sendEvent('{"m": "nd_kill"}')
 endfunction
 
 " run (continue)
 function! s:NodeInspectRun()
 	call s:removeSign()
+	call s:clearBacktraceWindow()
 	call s:sendEvent('{"m": "nd_continue"}')
 endfunction
 
 " step out
 function! s:NodeInspectStepOut()
 	call s:removeSign()
+	call s:clearBacktraceWindow()
 	call s:sendEvent('{"m": "nd_out"}')
 endfunction
 
@@ -399,6 +411,7 @@ function! s:NodeInspectStart(start, tsap)
 		execute "bo 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		let s:backtrace_win = win_getid()
 		set nonu
+		call s:clearBacktraceWindow()
 		" back to repl win
 		call win_gotoid(s:repl_win)
 		" is it with a filename or connection to host:port?
