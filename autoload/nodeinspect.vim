@@ -246,10 +246,10 @@ function! s:onDebuggerStopped(mes)
 		call win_gotoid(s:backtrace_win)
 		execute "%d"
 		for traceEntry in a:mes["backtrace"]
-			for prop in keys(traceEntry)
-				call append(getline('$'), traceEntry[prop])
-			endfor
+			" props are name & frameLocation
+			call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
 		endfor
+		execute 'normal! 1G'
 		" goto editor window
 		call win_gotoid(s:start_win)
 		execute "edit " . a:mes["file"]
@@ -408,7 +408,7 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "bo 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
+		execute "rightb 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()

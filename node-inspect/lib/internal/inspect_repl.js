@@ -491,7 +491,7 @@ function createRepl(inspector, nvim_bridge_p) {
         const relativeUrl =
           (script && getRelativePath(script.url)) || '<unknown>';
         const frameLocation =
-          `${relativeUrl}:${lineNumber + 1}:${columnNumber}`;
+          `${relativeUrl}:${lineNumber + 1}`;
         return {name, frameLocation};
 			}).reverse();
 		}
