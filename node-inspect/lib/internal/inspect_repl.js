@@ -304,6 +304,7 @@ function createRepl(inspector, nvim_bridge_p) {
   let currentBacktrace;
   let selectedFrame;
   let exitDebugRepl;
+	var isRunning = false;
 
 	let nvim_bridge = nvim_bridge_p;
 
@@ -645,6 +646,58 @@ function createRepl(inspector, nvim_bridge_p) {
     }
   }
 
+	function startCliRepl() {
+		// Don't display any default messages
+		const listeners = repl.listeners('SIGINT').slice(0);
+		repl.removeAllListeners('SIGINT');
+
+		const oldContext = repl.context;
+
+		exitDebugRepl = () => {
+			// Restore all listeners
+			process.nextTick(() => {
+				listeners.forEach((listener) => {
+					repl.on('SIGINT', listener);
+				});
+			});
+
+			// Exit debug repl
+			repl.eval = controlEval;
+
+			// Swap history
+			history.debug = repl.history;
+			repl.history = history.control;
+
+			repl.context = oldContext;
+			repl.setPrompt('debug> ');
+			repl.displayPrompt();
+
+			repl.removeListener('SIGINT', exitDebugRepl);
+			repl.removeListener('exit', exitDebugRepl);
+
+			exitDebugRepl = null;
+		};
+
+		// Exit debug repl on SIGINT
+		repl.on('SIGINT', exitDebugRepl);
+
+		// Exit debug repl on repl exit
+		repl.on('exit', exitDebugRepl);
+
+		// Set new
+		repl.eval = debugEval;
+		repl.context = {};
+
+		// Swap history
+		history.control = repl.history;
+		repl.history = history.debug;
+
+		repl.setPrompt('> ');
+
+		print('Press Ctrl + C to leave debug repl');
+		repl.displayPrompt();
+	}
+
   function listBreakpoints() {
     if (!knownBreakpoints.length) {
       print('No breakpoints yet');
@@ -807,6 +860,7 @@ function createRepl(inspector, nvim_bridge_p) {
   }
 
   Debugger.on('paused', ({ callFrames, reason /* , hitBreakpoints */ }) => {
+		isRunning = false;
     // Save execution context's data
     currentBacktrace = Backtrace.from(callFrames);
     selectedFrame = currentBacktrace[0];
@@ -836,6 +890,7 @@ function createRepl(inspector, nvim_bridge_p) {
   });
 
   function handleResumed() {
+		isRunning = true;
     currentBacktrace = null;
     selectedFrame = null;
   }
@@ -998,55 +1053,7 @@ function createRepl(inspector, nvim_bridge_p) {
       },
 
       get repl() {
-        // Don't display any default messages
-        const listeners = repl.listeners('SIGINT').slice(0);
-        repl.removeAllListeners('SIGINT');
-
-        const oldContext = repl.context;
-
-        exitDebugRepl = () => {
-          // Restore all listeners
-          process.nextTick(() => {
-            listeners.forEach((listener) => {
-              repl.on('SIGINT', listener);
-            });
-          });
-
-          // Exit debug repl
-          repl.eval = controlEval;
-
-          // Swap history
-          history.debug = repl.history;
-          repl.history = history.control;
-
-          repl.context = oldContext;
-          repl.setPrompt('debug> ');
-          repl.displayPrompt();
-
-          repl.removeListener('SIGINT', exitDebugRepl);
-          repl.removeListener('exit', exitDebugRepl);
-
-          exitDebugRepl = null;
-        };
-
-        // Exit debug repl on SIGINT
-        repl.on('SIGINT', exitDebugRepl);
-
-        // Exit debug repl on repl exit
-        repl.on('exit', exitDebugRepl);
-
-        // Set new
-        repl.eval = debugEval;
-        repl.context = {};
-
-        // Swap history
-        history.control = repl.history;
-        repl.history = history.debug;
-
-        repl.setPrompt('> ');
-
-        print('Press Ctrl + C to leave debug repl');
-        repl.displayPrompt();
+				startCliRepl()
       },
 
       get version() {
@@ -1099,27 +1106,51 @@ function createRepl(inspector, nvim_bridge_p) {
 
 		switch (message.m) {
 			case 'nd_next':
+				if (isRunning) {
+					print(`Only available when paused`);
+					return;
+				}
 				handleResumed();
 				Debugger.stepOver();
 				break;
 			case 'nd_into':
+				if (isRunning) {
+					print(`Only available when paused`);
+					return;
+				}
 				handleResumed();
 				Debugger.stepInto();
 				break;
 			case 'nd_out':
+				if (isRunning) {
+					print(`Only available when paused`);
+					return;
+				}
 				handleResumed();
 				Debugger.stepOut();
+				break;
+
+			case 'nd_pause':
+				if (!isRunning) {
+					print(`Only available when running`);
+					return;
+				}
+        Debugger.pause();
 				break;
 			case 'nd_kill':
 				inspector.killChild();
 				process.exit(0)
 				break;
 			case 'nd_continue':
+				if (isRunning) {
+					print(`Only available when paused`);
+					return;
+				}
 				handleResumed();
 				Debugger.resume();
 				break;
 			case 'nd_restart':
-				return inspector.run();
+				inspector.run();
 				break;
 			case 'nd_addbrkpt':
 				setBreakpoint(message.file, message.line);	

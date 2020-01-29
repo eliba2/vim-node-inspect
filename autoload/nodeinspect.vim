@@ -229,11 +229,18 @@ endfunction
 
 
 " empty the backtrace window, adds a 'debugger not stopped' window
-function! s:clearBacktraceWindow()
+function! s:clearBacktraceWindow(...)
+	if a:0 == 0
+		let message = 'Debugger not stopped'
+	else
+		let message = a:1
+	endif
 	let cur_win = win_getid()
 	call win_gotoid(s:backtrace_win)
+	execute "set modifiable"
 	execute "%d"
-	call setline('.', 'Debugger not stopped')
+	call setline('.', message)
+	execute "set nomodifiable"
 	call win_gotoid(cur_win)
 endfunction
 
@@ -244,17 +251,21 @@ function! s:onDebuggerStopped(mes)
 	if filereadable(a:mes["file"])
 		" print backtrace
 		call win_gotoid(s:backtrace_win)
+		execute "set modifiable"
 		execute "%d"
 		for traceEntry in a:mes["backtrace"]
 			" props are name & frameLocation
 			call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
 		endfor
 		execute 'normal! 1G'
+		execute "set nomodifiable"
 		" goto editor window
 		call win_gotoid(s:start_win)
 		execute "edit " . a:mes["file"]
 		execute ":" . a:mes["line"]
 		call s:addSign(a:mes["file"], a:mes["line"])
+	else
+		call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
 endfunction
 
@@ -362,6 +373,11 @@ function! s:NodeInspectStepOut()
 	call s:sendEvent('{"m": "nd_out"}')
 endfunction
 
+" pause - stop a running script
+function! s:NodeInspectPause()
+	call s:sendEvent('{"m": "nd_pause"}')
+endfunction
+
 " connects to the bridge, to to 2s. 
 " returns 1 if connected successfully, otherwise 0
 function! s:ConnectToBridge()
@@ -408,7 +424,7 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
+		execute "rightb 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
@@ -451,6 +467,8 @@ function! s:NodeInspectStart(start, tsap)
 			call s:NodeInspectRun()
 		endif
 	else
+		call s:removeSign()
+		call s:clearBacktraceWindow()
 		call s:sendEvent('{"m": "nd_restart"}')
 	endif
 endfunction
@@ -488,6 +506,14 @@ function! nodeinspect#NodeInspectStepOut()
 		return
 	endif
 	call s:NodeInspectStepOut()
+endfunction
+
+function! nodeinspect#NodeInspectPause()
+	if s:initiated == 0
+		echo "node-inspect not started"
+		return
+	endif
+	call s:NodeInspectPause()
 endfunction
 
 function! nodeinspect#NodeInspectRun()
