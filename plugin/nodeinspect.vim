@@ -1,5 +1,5 @@
 " ============================================================================
-" nodeinspect.vim,  a wrapper over node-inspect
+" nodeinspect.vim, interactive debugger for (n)vim
 " Eli Babila (elibabila@gmail.com)
 " ============================================================================
 
@@ -18,13 +18,14 @@ let nodeinspect_loaded = 1
 command! -nargs=0 NodeInspectStart call nodeinspect#NodeInspectStart()
 command! -nargs=0 NodeInspectRun call nodeinspect#NodeInspectRun()
 command! -nargs=1 NodeInspectConnect call nodeinspect#NodeInspectConnect(<args>)
-command! -nargs=0 NodeInspectPause call nodeinspect#NodeInspectPause()
+"command! -nargs=0 NodeInspectPause call nodeinspect#NodeInspectPause()
 command! -nargs=0 NodeInspectStepOver call nodeinspect#NodeInspectStepOver()
 command! -nargs=0 NodeInspectStepInto call nodeinspect#NodeInspectStepInto()
 command! -nargs=0 NodeInspectStepOut call nodeinspect#NodeInspectStepOut()
 command! -nargs=0 NodeInspectStop call nodeinspect#NodeInspectStop()
 command! -nargs=0 NodeInspectToggleBreakpoint call nodeinspect#NodeInspectToggleBreakpoint()
 command! -nargs=0 NodeInspectRemoveAllBreakpoints call nodeinspect#NodeInspectRemoveAllBreakpoints()
+"command! -nargs=1 NodeInspectConnect call nodeinspect#NodeInspectAddWatch(<args>)
 
 autocmd VimEnter * call nodeinspect#OnNodeInspectEnter()
 

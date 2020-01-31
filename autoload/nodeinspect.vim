@@ -4,6 +4,7 @@ let s:channel = 0
 let s:sign_id = 2
 let s:repl_win = -1
 let s:backtrace_win = -1
+let s:inspect_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -134,6 +135,22 @@ function! s:NodeInspectCleanup()
 endfunction
 
 
+" if configuration applies, get the local file path
+function! s:getLocalFilePath(file)
+	if has_key(s:configuration,"localPath") == 0 || has_key(s:configuration,"remotePath") == 0
+		return a:file
+	endif
+	" files arrive relative(?) is so, add '/'
+	"let preFileStr = ''
+	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:configuration["remotePath"]) > 1 && s:configuration["remotePath"][0:0] == '/'
+		let preFileStr = '/'
+	"endif
+	" strip file of its path, add it to the local
+	let localFile = substitute(preFileStr.a:file,	s:configuration["remotePath"], s:configuration["localPath"], "")
+	return localFile
+endfunction
+
+
 
 
 " if configuration applies, get the remote file path
@@ -222,13 +239,25 @@ function! s:NodeInspectToggleBreakpoint()
 		" send event only if node-inspect was started
 		if s:initiated == 1
 			let remoteFile = s:getRemoteFilePath(file)
-			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . file . '", "line":' . line . '}')
+			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 		endif
 	endif
 endfunction
 
 
-" empty the backtrace window, adds a 'debugger not stopped' window
+function! s:updateWatchWindow()
+	let cur_win = win_getid()
+	call win_gotoid(s:inspect_win)
+	execute "set modifiable"
+	execute "%d"
+	call setline('.', "Auto")
+	execute "set nomodifiable"
+	call win_gotoid(cur_win)
+endfunction
+
+
+" empty the backtrace window, adds a 'debugger not stopped' window by default
+" or a user message
 function! s:clearBacktraceWindow(...)
 	if a:0 == 0
 		let message = 'Debugger not stopped'
@@ -248,7 +277,9 @@ endfunction
 " called when the debuggger was stopped. settings signs and position
 function! s:onDebuggerStopped(mes)
 	" open the relevant file only if it can be found locally
-	if filereadable(a:mes["file"])
+	" translate to local in case of remote connection
+	let localFile = s:getLocalFilePath(a:mes["file"])
+	if filereadable(localFile)
 		" print backtrace
 		call win_gotoid(s:backtrace_win)
 		execute "set modifiable"
@@ -261,12 +292,13 @@ function! s:onDebuggerStopped(mes)
 		execute "set nomodifiable"
 		" goto editor window
 		call win_gotoid(s:start_win)
-		execute "edit " . a:mes["file"]
+		execute "edit " . localFile
 		execute ":" . a:mes["line"]
-		call s:addSign(a:mes["file"], a:mes["line"])
+		call s:addSign(localFile, a:mes["line"])
 	else
 		call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
+	"call s:updateWatchWindow()
 endfunction
 
 " on receiving a message from the node bridge
@@ -311,6 +343,9 @@ function! OnNodeInspectExit(...)
 	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
 		execute "bd!"
 	endif
+	"if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
+		"execute "bd!"
+	"endif
 	call s:NodeInspectCleanup()
 endfunction
 
@@ -411,6 +446,15 @@ function! s:NodeInspectStart(start, tsap)
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
+
+	" load configuration or remove it if needed. This will remove the entire
+	" configuraton; its ok for now as it holds only connection related stuff
+	if a:tsap == ''
+		let s:configuration = {}
+	else
+		call s:LoadConfigFile()
+	endif
+
 	" register global on exit, add signs 
 	if s:initiated == 0
 		let s:initiated = 1
@@ -420,14 +464,18 @@ function! s:NodeInspectStart(start, tsap)
 			let file = expand('%:p')
 		endif
 		" create bottom buffer, switch to it
-		execute "bo 10new"
+		execute "bo ".winheight(s:start_win)/3."new"
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb 30vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
+		" create inspect window
+		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		"let s:inspect_win = win_getid()
+		"set nonu
 		" back to repl win
 		call win_gotoid(s:repl_win)
 		" is it with a filename or connection to host:port?
@@ -541,8 +589,10 @@ function! nodeinspect#NodeInspectConnect(tsap)
 		echo "close running instance first"
 		return
 	endif
-	" try and read the config file before starting
-	call s:LoadConfigFile()
 	call s:NodeInspectStart(0,a:tsap)
 endfunction
+
+"function! nodeinspect#NodeInspectAddWatch(watch)
+	"call s:NodeInspectAddWatch(a:watch)
+"endfunction
 

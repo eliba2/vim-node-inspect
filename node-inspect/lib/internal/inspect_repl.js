@@ -859,6 +859,11 @@ function createRepl(inspector, nvim_bridge_p) {
       });
   }
 
+	// gets a method arguments, if exists. called on break
+	function getArguments() {
+		//console.log(evalInCurrentContext(f);
+	}
+
   Debugger.on('paused', ({ callFrames, reason /* , hitBreakpoints */ }) => {
 		isRunning = false;
     // Save execution context's data
@@ -872,6 +877,7 @@ function createRepl(inspector, nvim_bridge_p) {
 
     const header = `${breakType} in ${scriptUrl}:${lineNumber + 1}`;
 		/* notify nvim */
+		//getArguments(); // call get arguments and set the parameters to the stop function to display in the watch window
 		let m = { m: 'nd_stopped', file: scriptUrl, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};
 		nvim_bridge.send(m);
 
