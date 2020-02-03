@@ -247,12 +247,15 @@ endfunction
 
 function! s:updateWatchWindow()
 	let cur_win = win_getid()
-	call win_gotoid(s:inspect_win)
-	execute "set modifiable"
-	execute "%d"
-	call setline('.', "Auto")
-	execute "set nomodifiable"
-	call win_gotoid(cur_win)
+	let gotoResult = win_gotoid(s:inspect_win)
+	if gotoResult == 1
+		" execute "set modifiable"
+		execute "%d"
+		call setline('.', "Auto")
+		" execute "set nomodifiable"
+		call win_gotoid(cur_win)
+		" execute "set modifiable"
+	endif
 endfunction
 
 
@@ -265,12 +268,15 @@ function! s:clearBacktraceWindow(...)
 		let message = a:1
 	endif
 	let cur_win = win_getid()
-	call win_gotoid(s:backtrace_win)
-	execute "set modifiable"
-	execute "%d"
-	call setline('.', message)
-	execute "set nomodifiable"
-	call win_gotoid(cur_win)
+	let gotoResult = win_gotoid(s:backtrace_win)
+	if gotoResult == 1
+		" execute "set modifiable"
+		execute "%d"
+		call setline('.', message)
+		" execute "set nomodifiable"
+		call win_gotoid(cur_win)
+		" execute "set modifiable"
+	endif
 endfunction
 
 
@@ -281,17 +287,20 @@ function! s:onDebuggerStopped(mes)
 	let localFile = s:getLocalFilePath(a:mes["file"])
 	if filereadable(localFile)
 		" print backtrace
-		call win_gotoid(s:backtrace_win)
-		execute "set modifiable"
-		execute "%d"
-		for traceEntry in a:mes["backtrace"]
-			" props are name & frameLocation
-			call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
-		endfor
-		execute 'normal! 1G'
-		execute "set nomodifiable"
+		let gotoResult = win_gotoid(s:backtrace_win)
+		if gotoResult == 1
+			" execute "set modifiable"
+			execute "%d"
+			for traceEntry in a:mes["backtrace"]
+				" props are name & frameLocation
+				call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
+			endfor
+			execute 'normal! 1G'
+			" execute "set nomodifiable"
+		endif
 		" goto editor window
 		call win_gotoid(s:start_win)
+		" execute "set modifiable"
 		execute "edit " . localFile
 		execute ":" . a:mes["line"]
 		call s:addSign(localFile, a:mes["line"])
@@ -468,12 +477,12 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
 		" create inspect window
-		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		"let s:inspect_win = win_getid()
 		"set nonu
 		" back to repl win
