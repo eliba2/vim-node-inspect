@@ -53,6 +53,15 @@ nnoremap <silent><F9> :NodeInspectToggleBreakpoint<cr>
 nnoremap <silent><F10> :NodeInspectStop<cr>
 ```
 
+## Breakpoints
+
+The plugin saves your breakpoint's locations between Vim sessions. Once the plugin is started it will try and re-activate the breakpoints for the current location, that's for all the breakpoints which root in the current working directory.
+
+Note breakpoints are triggered through Vim and resolved in node, so resolved locations might differ from the triggered ones. 
+The breakpoints signs appear in the resolved locations.
+
+
+
 ## Connecting to a running container
 
 You'll need to configure the local and remote directories when connecting to a remote host or the local instance will set the wrong breakpoints locations. This can be set by creating a configuration file "vim-node-config.json" in the relevant project' directory, as follows:
