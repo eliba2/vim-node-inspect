@@ -363,6 +363,22 @@ function createRepl(inspector, nvim_bridge_p) {
     return formatScripts();
   };
 
+	/* for vim api, get mapping of current scripts */
+  function vimGetScripts() {
+    function isVisible(script) {
+      return !script.isNative || isCurrentScript(script);
+    }
+		let scripts = {};
+    Object.keys(knownScripts)
+			.map((scriptId) => knownScripts[scriptId])
+			.filter(isVisible)
+			.map((script) => {
+				const { url } = script;
+				scripts[url] = true;
+			});
+		return scripts;
+  }
+
   const profiles = [];
   class Profile {
     constructor(data) {
@@ -644,6 +660,9 @@ function createRepl(inspector, nvim_bridge_p) {
     if (!isExisting) {
       knownBreakpoints.push({ breakpointId, location });
     }
+		// notify vim the breakpoint was resolved
+		let m = { m: 'nd_brk_resolved', file: location.scriptUrl, line: location.lineNumber + 1 };
+		nvim_bridge.send(m);
   }
 
 	function startCliRepl() {
@@ -716,14 +735,14 @@ function createRepl(inspector, nvim_bridge_p) {
     print(breaklist);
   }
 
-  function setBreakpoint(script, line, condition, silent) {
+  async function setBreakpoint(script, line, condition, silent) {
     function registerBreakpoint({ breakpointId, actualLocation }) {
       handleBreakpointResolved({ breakpointId, location: actualLocation });
       if (actualLocation && actualLocation.scriptId) {
         if (!silent) return '';// getSourceSnippet(actualLocation, 5);
       } else {
 				// skip for vim
-        //print(`Warning: script '${script}' was not loaded yet.`);
+				//print(`Warning: script '${script}' was not loaded yet.`);
       }
       return undefined;
     }
@@ -732,7 +751,12 @@ function createRepl(inspector, nvim_bridge_p) {
     if (script === undefined) {
       return Debugger
         .setBreakpoint({ location: getCurrentLocation(), condition })
-        .then(registerBreakpoint);
+        .then(registerBreakpoint)
+				.catch(e => {
+					// failed (already exists?)
+					let m = { m: 'nd_brk_failed', file: script, line: getCurrentLocation().lineNumber };
+					nvim_bridge.send(m);
+				});
     }
 
     // setBreakpoint(line): set breakpoint in current script at specific line
@@ -742,7 +766,12 @@ function createRepl(inspector, nvim_bridge_p) {
         lineNumber: script - 1,
       };
       return Debugger.setBreakpoint({ location, condition })
-        .then(registerBreakpoint);
+        .then(registerBreakpoint)
+				.catch(e => {
+					// failed (already exists?) remove it
+					let m = { m: 'nd_brk_failed', file: script, line: line };
+					nvim_bridge.send(m);
+				});
     }
 
     if (typeof script !== 'string') {
@@ -796,8 +825,14 @@ function createRepl(inspector, nvim_bridge_p) {
 
     if (scriptId !== null) {
       const location = { scriptId, lineNumber: line - 1 };
+
       return Debugger.setBreakpoint({ location, condition })
-        .then(registerBreakpoint);
+        .then(registerBreakpoint)
+				.catch(e => {
+					// failed (already exists?)
+					let m = { m: 'nd_brk_failed', file: script, line: line };
+					nvim_bridge.send(m);
+				});
     }
 
     const escapedPath = script.replace(/([/\\.?*()^${}|[\]])/g, '\\$1');
@@ -816,7 +851,12 @@ function createRepl(inspector, nvim_bridge_p) {
           });
         }
         return registerBreakpoint(bp);
-      });
+      })
+			.catch(e => {
+				// failed (already exists?) remove it
+				let m = { m: 'nd_brk_failed', file: script, line: line };
+				nvim_bridge.send(m);
+			});
   }
 
   function clearBreakpoint(url, line) {
@@ -1102,13 +1142,13 @@ function createRepl(inspector, nvim_bridge_p) {
       Debugger.setAsyncCallStackDepth({ maxDepth: 0 }),
       Debugger.setBlackboxPatterns({ patterns: [] }),
       Debugger.setPauseOnExceptions({ state: pauseOnExceptionState }),
-      restoreBreakpoints(),
+      //restoreBreakpoints(), // disabled for vim
       Runtime.runIfWaitingForDebugger(),
     ];
     return Promise.all(setupTasks);
   }
 
-	function handleVimEvents(message) {
+	async function handleVimEvents(message) {
 
 		switch (message.m) {
 			case 'nd_next':
@@ -1159,10 +1199,10 @@ function createRepl(inspector, nvim_bridge_p) {
 				inspector.run();
 				break;
 			case 'nd_addbrkpt':
-				setBreakpoint(message.file, message.line);	
+				await setBreakpoint(message.file, message.line);	
 				break;
 			case 'nd_removebrkpt':
-				clearBreakpoint(message.file, message.line);	
+				await clearBreakpoint(message.file, message.line);	
 				break;
 			case 'nd_removeallbrkpts':
 				Object.keys(message.breakpoints).map(file => { 
@@ -1171,11 +1211,22 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_setbreakpoints':
 				Object.keys(message.breakpoints).map(file => { 
-					Object.keys(message.breakpoints[file]).map(line => setBreakpoint(file, Number(line)) );
+					Object.keys(message.breakpoints[file]).map(async (line) => await setBreakpoint(file, Number(line)) );
 				});
 				break;
+			case 'nd_removebreakpoints':
+				Object.keys(message.breakpoints).map(file => { 
+					Object.keys(message.breakpoints[file]).map(async (line) => await removeBreakpoint(file, Number(line)) );
+				});
+				break;
+			case 'nd_verifyrestart':
+				if (vimGetScripts()[message.file]) {
+					let m = { m: 'nd_restartequired' };
+					nvim_bridge.send(m);
+				}
+				break;
 			default:
-				console.error("unknown message from vim");
+				console.error("unknown message from vim",JSON.stringify(message));
 		}
 
 	}

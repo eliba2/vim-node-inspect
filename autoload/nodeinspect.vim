@@ -14,9 +14,12 @@ let s:breakpointsUnhandledBuffers = {}
 let s:breakpointsFile = s:plugin_path . '/breakpoints'
 let s:configuration = {}
 let s:configFileName = 'vim-node-config.json' 
+let s:lastStartIsRunning = 0
+let s:msgDelimiter = '&&'
 
 autocmd VimLeavePre * call OnVimLeavePre()
 autocmd BufEnter * call OnBufEnter()
+autocmd BufWritePost * call OnBufWritePost()
 
 " utility functions to add signs
 function! s:addBrkptSign(file, line)
@@ -105,16 +108,16 @@ function! s:LoadConfigFile()
 		endfor
 		" loaded the entire file, parse it to object
 		let configObj = json_decode(fullFile)
-		if type(configObj) == 4 && has_key(configObj,"localPath") == 1 && has_key(configObj,"remotePath") == 1
-			let s:configuration["localPath"] = configObj["localPath"]
-			let s:configuration["remotePath"] = configObj["remotePath"]
+		if type(configObj) == 4 && has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
+			let s:configuration["localRoot"] = configObj["localRoot"]
+			let s:configuration["remoteRoot"] = configObj["remoteRoot"]
 			" add trailing backslash if not present. it will normalize both inputs
 			" in case the user add one with and one without
-			if s:configuration["localPath"][-1:-1] != '/' 
-				let s:configuration["localPath"] = s:configuration["localPath"] . '/'
+			if s:configuration["localRoot"][-1:-1] != '/' 
+				let s:configuration["localRoot"] = s:configuration["localRoot"] . '/'
 			endif
-			if s:configuration["remotePath"][-1:-1] != '/' 
-				let s:configuration["remotePath"] = s:configuration["remotePath"] . '/'
+			if s:configuration["remoteRoot"][-1:-1] != '/' 
+				let s:configuration["remoteRoot"] = s:configuration["remoteRoot"] . '/'
 			endif
 		endif
 	endif
@@ -137,16 +140,16 @@ endfunction
 
 " if configuration applies, get the local file path
 function! s:getLocalFilePath(file)
-	if has_key(s:configuration,"localPath") == 0 || has_key(s:configuration,"remotePath") == 0
+	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
 		return a:file
 	endif
 	" files arrive relative(?) is so, add '/'
 	"let preFileStr = ''
-	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:configuration["remotePath"]) > 1 && s:configuration["remotePath"][0:0] == '/'
+	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:configuration["remoteRoot"]) > 1 && s:configuration["remoteRoot"][0:0] == '/'
 		let preFileStr = '/'
 	"endif
 	" strip file of its path, add it to the local
-	let localFile = substitute(preFileStr.a:file,	s:configuration["remotePath"], s:configuration["localPath"], "")
+	let localFile = substitute(preFileStr.a:file,	s:configuration["remoteRoot"], s:configuration["localRoot"], "")
 	return localFile
 endfunction
 
@@ -155,26 +158,26 @@ endfunction
 
 " if configuration applies, get the remote file path
 function! s:getRemoteFilePath(file)
-	if has_key(s:configuration,"localPath") == 0 || has_key(s:configuration,"remotePath") == 0
+	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
 		return a:file
 	endif
 	" strip file of its path, add it to the remote
-	let remoteFile = substitute(a:file,	s:configuration["localPath"], s:configuration["remotePath"], "")
+	let remoteFile = substitute(a:file,	s:configuration["localRoot"], s:configuration["remoteRoot"], "")
 	return remoteFile
 endfunction
 
 " if configuration applies, get the breakpoints object normalized according to
 " the remote path.
-function! s:getRemoteBreakpointsObj()
-	if has_key(s:configuration,"localPath") == 0 || has_key(s:configuration,"remotePath") == 0
-		return s:breakpoints
+function! s:getRemoteBreakpointsObj(breakpoints)
+	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
+		return a:breakpoints
 	endif
 	let remoteBreakpoints = {}
-	for filename in keys(s:breakpoints)
+	for filename in keys(a:breakpoints)
 		let remoteFile = s:getRemoteFilePath(filename)
 		let remoteBreakpoints[remoteFile] = {}
-		for lineKey in keys(s:breakpoints[filename])
-			let remoteBreakpoints[remoteFile][lineKey] = s:breakpoints[filename][lineKey]
+		for lineKey in keys(a:breakpoints[filename])
+			let remoteBreakpoints[remoteFile][lineKey] = a:breakpoints[filename][lineKey]
 		endfor
 	endfor
 	return remoteBreakpoints
@@ -200,7 +203,8 @@ function! s:removeBreakpoint(file, line)
 endfunction
 
 " remove all breakpoints. removes the signs is any
-function! s:NodeInspectRemoveAllBreakpoints()
+" node inspect notification will ocuur only if started
+function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
 	for filename in keys(s:breakpoints)
 		for line in keys(s:breakpoints[filename])
 			let signId = s:breakpoints[filename][line]
@@ -210,17 +214,59 @@ function! s:NodeInspectRemoveAllBreakpoints()
 			endif
 		endfor
 	endfor
-	if s:initiated == 1
-		let remoteFiles = s:getRemoteBreakpointsObj()
+	if a:inspectNotify == 1 && s:initiated == 1
+		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
 		call s:sendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
 	endif
 endfunction
 
-" toggle a breakpoint. handles signs as well.
+" called when node resolves this to a location.
+" in case the breakpoint buffer is not loaded (such as the case of loading
+" previous code), a bg buffer will be added, only if its relevant to the
+" current pwd. See readme for more info on this.
+function! s:breakpointResolved(file, line)
+	let localFile = s:getLocalFilePath(a:file)
+	if filereadable(localFile)
+		let found = 0
+		let loaded = 0
+		for buf in getbufinfo()
+			if buf.name == a:file
+				let found = 1
+				let loaded = 1
+				break
+			endif
+		endfor
+		if found == 0
+			" check if to load the file or not
+			let workingDir = getcwd()
+			if stridx(a:file, workingDir) != -1
+				execute  "badd ".a:file
+				let loaded = 1
+			endif
+		endif
+		if loaded == 1
+			let signId = s:addBrkptSign(localFile, a:line)
+			call s:addBreakpoint(localFile, a:line, signId)
+		endif
+	endif
+endfunction
+
+
+" toggle a breakpoint
+" in case a breakpoint does not exist in this location, solve it throught
+" devtools protocol. the callback will set the breakpoint.
+" in case if does exist, remove it.
+" that said, in case the debugger is not set - setting a breakpoint will
+" always succeed and once the debugger is started it will be validated.
 function! s:NodeInspectToggleBreakpoint()
+	" disabled when a buffer is modified
+	if &mod == 1
+		echom "Can't toggle a breakpoint while file is dirty"
+		return
+	endif
+	" check if the file is in the directory and check for relevant line
 	let file = expand('%:p')
 	let line = line('.')
-	" check if the file is in the directory and check for relevant line
 	if has_key(s:breakpoints, file) == 1 && has_key(s:breakpoints[file], line) == 1
 		let signId = s:breakpoints[file][line]
 		call s:removeBreakpoint(file, line)
@@ -233,11 +279,12 @@ function! s:NodeInspectToggleBreakpoint()
 			call s:sendEvent('{"m": "nd_removebrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 		endif
 	else
-		" add sign, store id
-		let signId =	s:addBrkptSign(file, line)
-		call s:addBreakpoint(file, line, signId)
-		" send event only if node-inspect was started
-		if s:initiated == 1
+		" request to add this sign. if node inspect was not started yet, add it to
+		" the list
+		if s:initiated == 0
+			let signId =	s:addBrkptSign(file, line)
+			call s:addBreakpoint(file, line, signId)
+		else 
 			let remoteFile = s:getRemoteFilePath(file)
 			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 		endif
@@ -245,13 +292,14 @@ function! s:NodeInspectToggleBreakpoint()
 endfunction
 
 
+
 function! s:updateWatchWindow()
 	let cur_win = win_getid()
 	call win_gotoid(s:inspect_win)
-	execute "set modifiable"
+	"execute "set modifiable"
 	execute "%d"
 	call setline('.', "Auto")
-	execute "set nomodifiable"
+	"execute "set nomodifiable"
 	call win_gotoid(cur_win)
 endfunction
 
@@ -266,10 +314,10 @@ function! s:clearBacktraceWindow(...)
 	endif
 	let cur_win = win_getid()
 	call win_gotoid(s:backtrace_win)
-	execute "set modifiable"
+	"execute "set modifiable"
 	execute "%d"
 	call setline('.', message)
-	execute "set nomodifiable"
+	"execute "set nomodifiable"
 	call win_gotoid(cur_win)
 endfunction
 
@@ -282,14 +330,14 @@ function! s:onDebuggerStopped(mes)
 	if filereadable(localFile)
 		" print backtrace
 		call win_gotoid(s:backtrace_win)
-		execute "set modifiable"
+		"execute "set modifiable"
 		execute "%d"
 		for traceEntry in a:mes["backtrace"]
 			" props are name & frameLocation
 			call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
 		endfor
 		execute 'normal! 1G'
-		execute "set nomodifiable"
+		"execute "set nomodifiable"
 		" goto editor window
 		call win_gotoid(s:start_win)
 		execute "edit " . localFile
@@ -301,20 +349,42 @@ function! s:onDebuggerStopped(mes)
 	"call s:updateWatchWindow()
 endfunction
 
-" on receiving a message from the node bridge
-function! OnNodeMessage(channel, msg)
-	if len(a:msg) == 0 || len(a:msg) == 1 &&  len(a:msg[0]) == 0
+
+" called when the debuggger session was stopped unintentionally (js error?)
+function! s:onDebuggerHalted()
+	"call s:removeSign()
+	call s:clearBacktraceWindow('Debugger not running')
+endfunction
+
+
+
+" on receiving a message from the node bridge.
+" multiple messages might arrive at one call hence the splitting.
+function! OnNodeMessage(channel, msgs)
+	if len(a:msgs) == 0 || len(a:msgs) == 1 && len(a:msgs[0]) == 0
 		" currently ignoring; called at the end (nvim)
 		let mes = ''
 	else
-		let mes = json_decode(a:msg)
-		if mes["m"] == "nd_stopped"
-			call s:onDebuggerStopped(mes)
-		elseif mes["m"] == "nd_sockerror"
-			echom "vim-node-inspect: failed to connect to remote host"
-		else
-			echo "vim-node-inspect: unknown message "
-		endif
+		let messages = split(a:msgs,s:msgDelimiter)
+		for msg in messages
+			let mes = json_decode(msg)
+			if mes["m"] == "nd_stopped"
+				call s:onDebuggerStopped(mes)
+			elseif mes["m"] == "nd_halt"
+				call s:onDebuggerHalted()
+			elseif mes["m"] == "nd_brk_resolved"
+				"echom "breakpoint resolved ".mes["file"]." ".mes["line"]
+				call s:breakpointResolved(mes["file"],mes["line"])
+			elseif mes["m"] == "nd_brk_failed"
+				echom "cant set breakpoint"
+			elseif mes["m"] == "nd_sockerror"
+				echom "vim-node-inspect: failed to connect to remote host"
+			elseif mes["m"] == "nd_restartequired"
+				call s:NodeInspectStart(s:lastStartIsRunning, '')
+			else
+				echo "vim-node-inspect: unknown message "
+			endif
+		endfor
 	endif
 endfunction
 
@@ -363,6 +433,17 @@ function! OnBufEnter()
 		unlet s:breakpointsUnhandledBuffers[filename]
 	endif
 endfunction
+
+
+" when saving a buffer during a debugg session, session should be restarted.
+function! OnBufWritePost()
+	if s:initiated == 1
+		let filename = expand('%:p')
+		let remoteFile = s:getRemoteFilePath(filename)
+		call s:sendEvent('{"m": "nd_verifyrestart", "file":"' . remoteFile . '"}')
+	endif
+endfunction
+
 
 " called upon startup, setting signs if any.
 function! nodeinspect#OnNodeInspectEnter()
@@ -455,10 +536,18 @@ function! s:NodeInspectStart(start, tsap)
 		call s:LoadConfigFile()
 	endif
 
+	" remove breakpoints if any, they will be re-invalidated after the debugger
+	" will (re)start.
+	let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
+	" that saves me from deepcopy
+	let remoteBreakpointsJson = json_encode(remoteBreakpoints)
+
 	" register global on exit, add signs 
 	if s:initiated == 0
-		let s:initiated = 1
 		" start
+		let s:initiated = 1
+		" remove all breakpoint, they will be resolved by node-inspect
+		call s:NodeInspectRemoveAllBreakpoints(0)
 		let s:start_win = win_getid()
 		if a:tsap == ''
 			let file = expand('%:p')
@@ -468,12 +557,12 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
 		" create inspect window
-		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile nomodifiable"
+		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
 		"let s:inspect_win = win_getid()
 		"set nonu
 		" back to repl win
@@ -504,21 +593,24 @@ function! s:NodeInspectStart(start, tsap)
 			echom 'cant connect to node-bridge'
 			return
 		endif
-
-		" send breakpoints, if any
-		sleep 150m
-		let remoteFiles = s:getRemoteBreakpointsObj()
-		call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . json_encode(remoteFiles) . '}')
-		if a:start == 1
-			" not sleeping will send the events together
-			sleep 150m
-			call s:NodeInspectRun()
-		endif
 	else
+		" remove all breakpoint, they will be resolved by node-inspect
+		call s:NodeInspectRemoveAllBreakpoints(1)
+		sleep 150m
 		call s:removeSign()
 		call s:clearBacktraceWindow()
 		call s:sendEvent('{"m": "nd_restart"}')
 	endif
+
+	" send breakpoints, if any
+	sleep 150m
+	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+	if a:start == 1
+		" not sleeping will send the events together
+		sleep 150m
+		call s:NodeInspectRun()
+	endif
+
 endfunction
 
 
@@ -529,7 +621,7 @@ function! nodeinspect#NodeInspectToggleBreakpoint()
 endfunction
 
 function! nodeinspect#NodeInspectRemoveAllBreakpoints()
-	call s:NodeInspectRemoveAllBreakpoints()
+	call s:NodeInspectRemoveAllBreakpoints(1)
 endfunction
 
 function! nodeinspect#NodeInspectStepOver()
@@ -565,6 +657,7 @@ function! nodeinspect#NodeInspectPause()
 endfunction
 
 function! nodeinspect#NodeInspectRun()
+	let s:lastStartIsRunning = 1
 	if s:initiated == 0
     call s:NodeInspectStart(1, '')
 	else
@@ -581,7 +674,8 @@ function! nodeinspect#NodeInspectStop()
 endfunction
 
 function! nodeinspect#NodeInspectStart()
-    call s:NodeInspectStart(0, '')
+	let s:lastStartIsRunning = 0
+	call s:NodeInspectStart(0, '')
 endfunction
 
 function! nodeinspect#NodeInspectConnect(tsap)
@@ -589,6 +683,7 @@ function! nodeinspect#NodeInspectConnect(tsap)
 		echo "close running instance first"
 		return
 	endif
+	let s:lastStartIsRunning = 0
 	call s:NodeInspectStart(0,a:tsap)
 endfunction
 

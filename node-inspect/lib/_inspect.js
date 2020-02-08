@@ -153,6 +153,8 @@ class NodeInspector {
     this.paused = true;
     this.child = null;
 
+		this.nvim_bridge = nvim_bridge;
+
     if (options.script) {
       this._runScript = runScript.bind(null,
         options.script,
@@ -283,6 +285,8 @@ class NodeInspector {
     }
     if (/Waiting for the debugger to disconnect\.\.\.\n$/.test(text)) {
       this.killChild();
+			let m = { m: 'nd_halt' };
+			this.nvim_bridge.send(m);
     }
   }
 }

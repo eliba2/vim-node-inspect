@@ -2,6 +2,7 @@ const socket_path = '/tmp/node-inspect.sock';
 const net = require('net');
 var EventEmitter = require('events').EventEmitter;
 const PORT = 9514;
+const MSG_DELIMITER = '&&';
 
 
 class NvimBridge {
@@ -16,7 +17,8 @@ class NvimBridge {
 	send(msg) {
 		if (this.client) {
 			// console.log("=> sending msg",msg);
-			this.client.write(JSON.stringify(msg));
+			let message = JSON.stringify(msg) + MSG_DELIMITER;
+			this.client.write(message);
 		}
 		else {
 			console.error("can't send event, vim object not set up");
