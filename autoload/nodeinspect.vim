@@ -373,7 +373,14 @@ function! OnNodeMessage(channel, msgs)
 		" currently ignoring; called at the end (nvim)
 		let mes = ''
 	else
-		let messages = split(a:msgs,s:msgDelimiter)
+		if type(a:msgs) == 3
+			" nvim receives this as a list
+			let messageText = a:msgs[0]
+			let messages = split(messageText, s:msgDelimiter)
+		else
+			" and vim as string
+			let messages = split(a:msgs, s:msgDelimiter)
+		endif
 		for msg in messages
 			let mes = json_decode(msg)
 			if mes["m"] == "nd_stopped"
