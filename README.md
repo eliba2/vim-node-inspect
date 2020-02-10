@@ -56,7 +56,10 @@ nnoremap <silent><F10> :NodeInspectStop<cr>
 ## Breakpoints
 
 The plugin saves your breakpoint's locations between Vim sessions. Once the plugin is started it will try and re-activate the breakpoints for the current location, that's for all the breakpoints which root in the current working directory.
-Note breakpoints are triggered through Vim and resolved in node, so resolved locations might differ from the triggered ones. The breakpoints signs appear in the resolved locations.
+
+Note breakpoints are triggered through Vim and resolved in node, so resolved locations might differ from the triggered ones. 
+The breakpoints signs appear in the resolved locations.
+
 
 ## Connecting to a running container
 
