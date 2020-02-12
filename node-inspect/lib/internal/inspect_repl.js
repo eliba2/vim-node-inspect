@@ -1153,7 +1153,7 @@ function createRepl(inspector, nvim_bridge_p) {
 		switch (message.m) {
 			case 'nd_next':
 				if (isRunning) {
-					print(`Only available when paused`);
+					print(`Only available when paused(1)`);
 					return;
 				}
 				handleResumed();
@@ -1161,7 +1161,7 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_into':
 				if (isRunning) {
-					print(`Only available when paused`);
+					print(`Only available when paused(2)`);
 					return;
 				}
 				handleResumed();
@@ -1169,16 +1169,15 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_out':
 				if (isRunning) {
-					print(`Only available when paused`);
+					print(`Only available when paused(3)`);
 					return;
 				}
 				handleResumed();
 				Debugger.stepOut();
 				break;
-
 			case 'nd_pause':
 				if (!isRunning) {
-					print(`Only available when running`);
+					print(`Only available when running(4)`);
 					return;
 				}
         Debugger.pause();
@@ -1189,7 +1188,7 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_continue':
 				if (isRunning) {
-					print(`Only available when paused`);
+					print(`Only available when paused(5)`);
 					return;
 				}
 				handleResumed();
@@ -1197,6 +1196,9 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_restart':
 				inspector.run();
+				break;
+			case 'nd_print':
+				print(message.txt);
 				break;
 			case 'nd_addbrkpt':
 				await setBreakpoint(message.file, message.line);	

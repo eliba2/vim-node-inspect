@@ -1,4 +1,6 @@
 let s:initiated = 0
+let s:connectionType = ''
+let s:connectionTsap = ''
 let s:plugin_path = expand('<sfile>:h:h')
 let s:channel = 0
 let s:sign_id = 2
@@ -395,7 +397,7 @@ function! OnNodeMessage(channel, msgs)
 			elseif mes["m"] == "nd_sockerror"
 				echom "vim-node-inspect: failed to connect to remote host"
 			elseif mes["m"] == "nd_restartequired"
-				call s:NodeInspectStart(s:lastStartIsRunning, '')
+				call s:NodeInspectStart(s:lastStartIsRunning, s:connectionTsap)
 			else
 				echo "vim-node-inspect: unknown message "
 			endif
@@ -439,12 +441,14 @@ function! OnBufEnter()
 	let filename = expand('%:p')
 	if has_key(s:breakpointsUnhandledBuffers, filename) == 1
 		" add relevant breakpoints signs
-		for lineKey in keys(s:breakpoints[filename])
-			" add sign override previous value
-			let signId =s:addBrkptSign(filename, lineKey)
-			call s:addBreakpoint(filename, lineKey, signId)
-		endfor
-		" its handled, remove it
+		if has_key(s:breakpoints, filename) == 1
+			for lineKey in keys(s:breakpoints[filename])
+				" add sign override previous value
+				let signId =s:addBrkptSign(filename, lineKey)
+				call s:addBreakpoint(filename, lineKey, signId)
+			endfor
+			" its handled, remove it
+		endif
 		unlet s:breakpointsUnhandledBuffers[filename]
 	endif
 endfunction
@@ -546,8 +550,12 @@ function! s:NodeInspectStart(start, tsap)
 	" load configuration or remove it if needed. This will remove the entire
 	" configuraton; its ok for now as it holds only connection related stuff
 	if a:tsap == ''
+		let s:connectionType = 'program'
+		let s:connectionTsap = ''
 		let s:configuration = {}
 	else
+		let s:connectionTsap = a:tsap
+		let s:connectionType = 'attach'
 		call s:LoadConfigFile()
 	endif
 
@@ -564,7 +572,7 @@ function! s:NodeInspectStart(start, tsap)
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:NodeInspectRemoveAllBreakpoints(0)
 		let s:start_win = win_getid()
-		if a:tsap == ''
+		if s:connectionType == 'program'
 			let file = expand('%:p')
 		endif
 		" create bottom buffer, switch to it
@@ -583,7 +591,7 @@ function! s:NodeInspectStart(start, tsap)
 		" back to repl win
 		call win_gotoid(s:repl_win)
 		" is it with a filename or connection to host:port?
-		if a:tsap == ''
+		if s:connectionType == 'program'
 			if has("nvim")
 				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
@@ -591,9 +599,9 @@ function! s:NodeInspectStart(start, tsap)
 			endif
 		else
 			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'on_exit': 'OnNodeInspectExit'})"
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:connectionTsap . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . a:tsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:connectionTsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		endif
 
@@ -608,19 +616,26 @@ function! s:NodeInspectStart(start, tsap)
 			echom 'cant connect to node-bridge'
 			return
 		endif
+		" send a conencted message, when connecting to a remote instance
+		" (node-inspect doesn't display anything in this case)
+		if s:connectionType == 'attach'
+			sleep 100m
+			call s:sendEvent('{"m": "nd_print", "txt":"Connected to '.s:connectionTsap.'\n"}')
+		endif
 	else
 		" remove all breakpoint, they will be resolved by node-inspect
-		call s:NodeInspectRemoveAllBreakpoints(1)
+		call s:NodeInspectRemoveAllBreakpoints(0)
 		sleep 150m
 		call s:removeSign()
 		call s:clearBacktraceWindow()
 		call s:sendEvent('{"m": "nd_restart"}')
+		sleep 200m
 	endif
 
 	" send breakpoints, if any
 	sleep 150m
 	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
-	if a:start == 1
+	if a:start == 1 && s:connectionType == 'program'
 		" not sleeping will send the events together
 		sleep 150m
 		call s:NodeInspectRun()
@@ -690,7 +705,11 @@ endfunction
 
 function! nodeinspect#NodeInspectStart()
 	let s:lastStartIsRunning = 0
-	call s:NodeInspectStart(0, '')
+	if s:initiated == 0
+		call s:NodeInspectStart(0, '')
+	else
+		call s:NodeInspectStart(0, s:connectionTsap)
+	endif
 endfunction
 
 function! nodeinspect#NodeInspectConnect(tsap)
