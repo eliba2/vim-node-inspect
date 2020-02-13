@@ -20,7 +20,6 @@ let s:lastStartIsRunning = 0
 let s:msgDelimiter = '&&'
 
 autocmd VimLeavePre * call OnVimLeavePre()
-autocmd BufEnter * call OnBufEnter()
 autocmd BufWritePost * call OnBufWritePost()
 
 " utility functions to add signs
@@ -82,19 +81,33 @@ endfunction
 function! s:loadBreakpointsFile()
 	" breakpoints file
 	if filereadable(s:breakpointsFile)
+		let workingDir = getcwd()
 		for fileLine in readfile(s:breakpointsFile, '')
 			let brkList = split(fileLine,"#")
 			let filename = brkList[0]
 			let allLines = split(brkList[1],',') 
+			" add this breakpoint only if relevant to the current pwd.
+			if stridx(filename, workingDir) != -1
+				if bufloaded(filename) == 0
+					execute  "badd ".filename
+				endif
+			endif
 			" adding to breakpoint list but not yet setting the breakpoints signs.
 			" this will be done in the bufenter autocmd
 			for line in allLines
-				call s:addBreakpoint(filename, str2nr(line), 0)
+				"call s:addBreakpoint(filename, str2nr(line), 0)
+				let line = str2nr(line)
+				echom "adding breakpoint ".filename.":".line
+				" mostly will not be initiated.
+				if s:initiated == 0
+					let signId =	s:addBrkptSign(filename, line)
+					call s:addBreakpoint(filename, line, signId)
+				else 
+					let remoteFile = s:getRemoteFilePath(filename)
+					call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+				endif
 			endfor
-			let s:breakpointsUnhandledBuffers[filename] = 1
 		endfor
-		" call for initial buf to setup the breakpoints signs as its not auto called
-		call OnBufEnter()
 	endif
 endfunction
 
@@ -242,7 +255,9 @@ function! s:breakpointResolved(file, line)
 			" check if to load the file or not
 			let workingDir = getcwd()
 			if stridx(a:file, workingDir) != -1
-				execute  "badd ".a:file
+				if bufloaded(a:file) == 0
+					execute  "badd ".a:file
+				endif
 				let loaded = 1
 			endif
 		endif
@@ -434,23 +449,6 @@ function! OnNodeInspectExit(...)
 		"execute "bd!"
 	"endif
 	call s:NodeInspectCleanup()
-endfunction
-
-" when entering a buffer, display relevant breakpoints for this file
-function! OnBufEnter()
-	let filename = expand('%:p')
-	if has_key(s:breakpointsUnhandledBuffers, filename) == 1
-		" add relevant breakpoints signs
-		if has_key(s:breakpoints, filename) == 1
-			for lineKey in keys(s:breakpoints[filename])
-				" add sign override previous value
-				let signId =s:addBrkptSign(filename, lineKey)
-				call s:addBreakpoint(filename, lineKey, signId)
-			endfor
-			" its handled, remove it
-		endif
-		unlet s:breakpointsUnhandledBuffers[filename]
-	endif
 endfunction
 
 
