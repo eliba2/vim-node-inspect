@@ -86,27 +86,28 @@ function! s:loadBreakpointsFile()
 			let brkList = split(fileLine,"#")
 			let filename = brkList[0]
 			let allLines = split(brkList[1],',') 
-			" add this breakpoint only if relevant to the current pwd.
+			" add breakpoints only if relevant to the current pwd.
 			if stridx(filename, workingDir) != -1
+				" load the buffer in the background if not loaded already
 				if bufloaded(filename) == 0
 					execute  "badd ".filename
 				endif
+				" adding to breakpoint list but not yet setting the breakpoints signs.
+				" this will be done in the bufenter autocmd
+				for line in allLines
+					"call s:addBreakpoint(filename, str2nr(line), 0)
+					let line = str2nr(line)
+					echom "adding breakpoint ".filename.":".line
+					" mostly will not be initiated.
+					if s:initiated == 0
+						let signId =	s:addBrkptSign(filename, line)
+						call s:addBreakpoint(filename, line, signId)
+					else 
+						let remoteFile = s:getRemoteFilePath(filename)
+						call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+					endif
+				endfor
 			endif
-			" adding to breakpoint list but not yet setting the breakpoints signs.
-			" this will be done in the bufenter autocmd
-			for line in allLines
-				"call s:addBreakpoint(filename, str2nr(line), 0)
-				let line = str2nr(line)
-				echom "adding breakpoint ".filename.":".line
-				" mostly will not be initiated.
-				if s:initiated == 0
-					let signId =	s:addBrkptSign(filename, line)
-					call s:addBreakpoint(filename, line, signId)
-				else 
-					let remoteFile = s:getRemoteFilePath(filename)
-					call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
-				endif
-			endfor
 		endfor
 	endif
 endfunction
