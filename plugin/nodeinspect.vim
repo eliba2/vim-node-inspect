@@ -25,7 +25,8 @@ command! -nargs=0 NodeInspectStepOut call nodeinspect#NodeInspectStepOut()
 command! -nargs=0 NodeInspectStop call nodeinspect#NodeInspectStop()
 command! -nargs=0 NodeInspectToggleBreakpoint call nodeinspect#NodeInspectToggleBreakpoint()
 command! -nargs=0 NodeInspectRemoveAllBreakpoints call nodeinspect#NodeInspectRemoveAllBreakpoints()
-"command! -nargs=1 NodeInspectConnect call nodeinspect#NodeInspectAddWatch(<args>)
+command! -nargs=0 NodeInspectAddWatch call nodeinspect#NodeInspectAddWatch()
+command! -nargs=0 NodeInspectRemoveWatch call nodeinspect#NodeInspectRemoveWatch()
 
 autocmd VimEnter * call nodeinspect#OnNodeInspectEnter()
 

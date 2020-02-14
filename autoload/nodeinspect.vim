@@ -6,7 +6,6 @@ let s:channel = 0
 let s:sign_id = 2
 let s:repl_win = -1
 let s:backtrace_win = -1
-let s:inspect_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -86,27 +85,28 @@ function! s:loadBreakpointsFile()
 			let brkList = split(fileLine,"#")
 			let filename = brkList[0]
 			let allLines = split(brkList[1],',') 
-			" add this breakpoint only if relevant to the current pwd.
+			" add breakpoints only if relevant to the current pwd.
 			if stridx(filename, workingDir) != -1
+				" load the buffer in the background if not loaded already
 				if bufloaded(filename) == 0
 					execute  "badd ".filename
 				endif
+				" adding to breakpoint list but not yet setting the breakpoints signs.
+				" this will be done in the bufenter autocmd
+				for line in allLines
+					"call s:addBreakpoint(filename, str2nr(line), 0)
+					let line = str2nr(line)
+					echom "adding breakpoint ".filename.":".line
+					" mostly will not be initiated.
+					if s:initiated == 0
+						let signId =	s:addBrkptSign(filename, line)
+						call s:addBreakpoint(filename, line, signId)
+					else 
+						let remoteFile = s:getRemoteFilePath(filename)
+						call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+					endif
+				endfor
 			endif
-			" adding to breakpoint list but not yet setting the breakpoints signs.
-			" this will be done in the bufenter autocmd
-			for line in allLines
-				"call s:addBreakpoint(filename, str2nr(line), 0)
-				let line = str2nr(line)
-				echom "adding breakpoint ".filename.":".line
-				" mostly will not be initiated.
-				if s:initiated == 0
-					let signId =	s:addBrkptSign(filename, line)
-					call s:addBreakpoint(filename, line, signId)
-				else 
-					let remoteFile = s:getRemoteFilePath(filename)
-					call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
-				endif
-			endfor
 		endfor
 	endif
 endfunction
@@ -311,7 +311,7 @@ endfunction
 
 
 function! s:updateWatchWindow()
-	let gotoResult = win_gotoid(s:inspect_win)
+	let gotoResult = win_gotoid(nodeinspect#watches#inspect_win)
 	if gotoResult == 1
 		" execute "set modifiable"
 		execute "%d"
@@ -445,9 +445,9 @@ function! OnNodeInspectExit(...)
 	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
 		execute "bd!"
 	endif
-	"if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
-		"execute "bd!"
-	"endif
+	if nodeinspect#watches#inspect_win!= -1 && win_gotoid(nodeinspect#watches#inspect_win) == 1
+		execute "bd!"
+	endif
 	call s:NodeInspectCleanup()
 endfunction
 
@@ -578,14 +578,14 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Callstack"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
 		" create inspect window
-		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
-		"let s:inspect_win = win_getid()
-		"set nonu
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Watches"
+		let nodeinspect#watches#inspect_win = win_getid()
+		set nonu
 		" back to repl win
 		call win_gotoid(s:repl_win)
 		" is it with a filename or connection to host:port?
@@ -640,7 +640,6 @@ function! s:NodeInspectStart(start, tsap)
 	endif
 
 endfunction
-
 
 
 " Callable functions / plugin API
@@ -719,7 +718,11 @@ function! nodeinspect#NodeInspectConnect(tsap)
 	call s:NodeInspectStart(0,a:tsap)
 endfunction
 
-"function! nodeinspect#NodeInspectAddWatch(watch)
-	"call s:NodeInspectAddWatch(a:watch)
-"endfunction
+function! nodeinspect#NodeInspectAddWatch()
+	call nodeinspect#watches#AddWatch()
+endfunction
+
+function! nodeinspect#NodeInspectRemoveWatch()
+	call nodeinspect#watches#RemoveWatch()
+endfunction
 
