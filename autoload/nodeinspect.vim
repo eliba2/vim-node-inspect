@@ -310,19 +310,6 @@ endfunction
 
 
 
-function! s:updateWatchWindow()
-	let gotoResult = win_gotoid(nodeinspect#watches#inspect_win)
-	if gotoResult == 1
-		" execute "set modifiable"
-		execute "%d"
-		call setline('.', "Auto")
-		" execute "set nomodifiable"
-		call win_gotoid(cur_win)
-		" execute "set modifiable"
-	endif
-endfunction
-
-
 " empty the backtrace window, adds a 'debugger not stopped' window by default
 " or a user message
 function! s:clearBacktraceWindow(...)
@@ -371,7 +358,10 @@ function! s:onDebuggerStopped(mes)
 	else
 		call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
-	"call s:updateWatchWindow()
+	" request watches update	
+	let watches = nodeinspect#watches#GetWatches()
+	let watchesJson = json_encode(watches)
+	call s:sendEvent('{"m": "nd_updatewatches", "watches":' . watchesJson . '}')
 endfunction
 
 
@@ -445,7 +435,8 @@ function! OnNodeInspectExit(...)
 	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
 		execute "bd!"
 	endif
-	if nodeinspect#watches#inspect_win!= -1 && win_gotoid(nodeinspect#watches#inspect_win) == 1
+	let inspectWinId = nodeinspect#watches#GetWinId()
+	if inspectWinId != -1 && win_gotoid(inspectWinId) == 1
 		execute "bd!"
 	endif
 	call s:NodeInspectCleanup()
@@ -584,7 +575,7 @@ function! s:NodeInspectStart(start, tsap)
 		call s:clearBacktraceWindow()
 		" create inspect window
 		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Watches"
-		let nodeinspect#watches#inspect_win = win_getid()
+		call nodeinspect#watches#SetWinId(win_getid())
 		set nonu
 		" back to repl win
 		call win_gotoid(s:repl_win)
