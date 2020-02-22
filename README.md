@@ -2,13 +2,14 @@
 Interactive node debugger for (n)vim.
 
 ## Description
-This plugin adds node debugging capabilities to vim with interactive CLI. Under the hood it wraps node-inspect *(https://github.com/nodejs/node-inspect)*.
+This plugin adds node debugging capabilities to vim with interactive CLI. Under the hood it wraps a modified version of node-inspect *(https://github.com/nodejs/node-inspect)*.
 
 
 [![asciicast](https://asciinema.org/a/292793.svg)](https://asciinema.org/a/292793)
 
 ## Requirements
-Vim8.1/Neovim.
+Vim**8.1+**/Recent Neovim.
+Node in the path.
 
 ## Installation
 Install with your favorite package manager. For vim-plug its
@@ -41,6 +42,8 @@ NodeInspectToggleBreakpoint - Toggle breakpoint
 
 NodeInspectRemoveAllBreakpoints - Removes all breakpoints
 
+NodeInspectAddWatch - Add the word under the cursor to the watch window
+
 
 There are no default bindings; the following is added for convinience:
 ```
@@ -61,6 +64,12 @@ Note breakpoints are triggered through Vim and resolved in node, so resolved loc
 The breakpoints signs appear in the resolved locations.
 
 
+## Watches
+
+There are two ways to add a watch. One is to use the *NodeInspectAddWatch* command which will add the word under the cursor as a watch. The other is by directly editing the watch window: this will resolve the watches, one per line.
+Remove a watch by deleting it from the watch window.
+
+
 ## Connecting to a running container
 
 You'll need to configure the local and remote directories when connecting to a remote host or the local instance will set the wrong breakpoints locations. This can be set by creating a configuration file "vim-node-config.json" in the relevant project' directory, as follows:
@@ -77,5 +86,5 @@ In beta. Means its useful; things may change or fail.
 **NOT** tested on Windows.
 
 ## License
-Whatever node-inspect is.
+MIT.
 
