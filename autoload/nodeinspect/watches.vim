@@ -1,39 +1,12 @@
-
 let s:inspect_win = -1
 let s:watches = {}
 
-autocmd InsertLeave * call OnTextModification()
-autocmd TextChanged * call OnTextModification()
-
 
 function! OnTextModification()
-	if win_getid() != s:inspect_win 
-		return
-	endif
 	call s:RecalcWatchesKeys()
-	call s:Draw()
+	"call s:Draw()
+	call s:updateWatches()
 endfunction
-
-
-function s:DrawKeysOnly()
-	let cur_win = win_getid()
-	let gotoResult = win_gotoid(s:inspect_win)
-	if gotoResult == 1
-		" execute "set modifiable"
-		execute "%d"
-		" execute "set nomodifiable"
-		
-		" loop here over all watches and update their values
-		for watch in keys(s:watches)
-			call append(getline('$'), watch)
-		endfor
-		
-		" endofupdate
-		call win_gotoid(cur_win)
-		" execute "set modifiable"
-	endif
-endfunction
-
 
 
 function s:Draw()
@@ -48,7 +21,6 @@ function s:Draw()
 		for watch in keys(s:watches)
 			call append(getline('$'), watch."      ".s:watches[watch])
 		endfor
-		
 		" endofupdate
 		call win_gotoid(cur_win)
 		" execute "set modifiable"
@@ -82,6 +54,25 @@ endfunction
 
 
 
+function! s:updateWatches()
+	if len(keys(s:watches)) > 0
+		let watchesJson = json_encode(s:watches)
+		call nodeinspect#utils#SendEvent('{"m": "nd_updatewatches", "watches":' . watchesJson . '}')
+	endif
+endfunction
+
+
+function! nodeinspect#watches#OnWatchesResolved(watches)
+	if len(keys(a:watches)) > 0
+		for watch in keys(a:watches)
+			if has_key(s:watches, watch) == 1
+				let s:watches[watch] = a:watches[watch]
+			endif
+		endfor
+		noautocmd call s:Draw()
+	endif
+endfunction
+
 
 function! nodeinspect#watches#GetWatches()
 	return s:watches
@@ -93,44 +84,38 @@ function! nodeinspect#watches#GetWinId()
 endfunction
 
 
-function! nodeinspect#watches#SetWinId(id)
-	let s:inspect_win = a:id
-endfunction
-
-
 function! nodeinspect#watches#Draw()
 	call s:Draw()
 endfunction
 
 
-
-" add a watch, input by vim's input
-function! nodeinspect#watches#AddWatch()
-	call inputsave()
-  let watch = input('Enter name: ')
-  call inputrestore()
-	if len(watch) > 0
-		if has_key(s:watches, watch) == 0
-			let s:watches[watch] = 'n/a'
-			call s:Draw()
-		else
-			echom "watch already exists"
-		endif
-	endif
+function! nodeinspect#watches#UpdateWatches()
+	call s:updateWatches()
 endfunction
 
-" remove a watch, input by vim's input
-function! nodeinspect#watches#RemoveWatch()
-	call inputsave()
-  let watch = input('Enter name: ')
-  call inputrestore()
-	if len(watch) > 0
-		if has_key(s:watches, watch) == 1
-			call Draw()
-		else
-			echom "watch does not exist"
+function! nodeinspect#watches#CreateWatchWindow(startWin)
+	execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Watches"
+	let s:inspect_win = win_getid()
+	set nonu
+	autocmd InsertLeave <buffer> noautocmd call OnTextModification()
+	autocmd BufLeave <buffer> noautocmd call OnTextModification()
+endfunction
+
+
+" add the word under the cursor to the watch window
+function! nodeinspect#watches#AddWatch()
+	let wordUnderCursor = expand("<cword>")
+	if len(wordUnderCursor) > 0
+		let cur_win = win_getid()
+		let gotoResult = win_gotoid(s:inspect_win)
+		if gotoResult == 1
+			call append(getline('$'), wordUnderCursor)
+			call s:RecalcWatchesKeys()
+			call s:updateWatches()
+			call win_gotoid(cur_win)
 		endif
 	endif
+
 endfunction
 
 
