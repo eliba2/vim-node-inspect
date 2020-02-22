@@ -2,11 +2,9 @@ let s:initiated = 0
 let s:connectionType = ''
 let s:connectionTsap = ''
 let s:plugin_path = expand('<sfile>:h:h')
-let s:channel = 0
 let s:sign_id = 2
 let s:repl_win = -1
 let s:backtrace_win = -1
-let s:inspect_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -46,15 +44,6 @@ function! s:SignInit()
 	execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
 	" breakpoint sign
 	execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
-endfunction
-
-" send event to node bridge
-function! s:sendEvent(e)
-	if has("nvim") && s:channel > 0
-		call chansend(s:channel, a:e)
-	elseif ch_status(s:channel) == "open"
-		call ch_sendraw(s:channel, a:e)
-	endif
 endfunction
 
 
@@ -104,7 +93,7 @@ function! s:loadBreakpointsFile()
 						call s:addBreakpoint(filename, line, signId)
 					else 
 						let remoteFile = s:getRemoteFilePath(filename)
-						call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+						call nodeinspect#utils#SendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 					endif
 				endfor
 			endif
@@ -146,11 +135,7 @@ function! s:NodeInspectCleanup()
 	call s:removeSign()
 	call s:saveBreakpointsFile()
 	" close channel if available
-	if has("nvim") && s:channel > 0
-		call chanclose(s:channel)
-	elseif ch_status(s:channel) == "open"
-		call ch_close(s:channel)
-	endif	
+	call nodeinspect#utils#CloseChannel()
 endfunction
 
 
@@ -232,7 +217,7 @@ function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
 	endfor
 	if a:inspectNotify == 1 && s:initiated == 1
 		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
-		call s:sendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
+		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
 	endif
 endfunction
 
@@ -294,7 +279,7 @@ function! s:NodeInspectToggleBreakpoint()
 		if s:initiated == 1
 			" remote file might be different according to configurations.
 			let remoteFile = s:getRemoteFilePath(file)
-			call s:sendEvent('{"m": "nd_removebrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+			call nodeinspect#utils#SendEvent('{"m": "nd_removebrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 		endif
 	else
 		" request to add this sign. if node inspect was not started yet, add it to
@@ -304,24 +289,11 @@ function! s:NodeInspectToggleBreakpoint()
 			call s:addBreakpoint(file, line, signId)
 		else 
 			let remoteFile = s:getRemoteFilePath(file)
-			call s:sendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+			call nodeinspect#utils#SendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
 		endif
 	endif
 endfunction
 
-
-
-function! s:updateWatchWindow()
-	let gotoResult = win_gotoid(s:inspect_win)
-	if gotoResult == 1
-		" execute "set modifiable"
-		execute "%d"
-		call setline('.', "Auto")
-		" execute "set nomodifiable"
-		call win_gotoid(cur_win)
-		" execute "set modifiable"
-	endif
-endfunction
 
 
 " empty the backtrace window, adds a 'debugger not stopped' window by default
@@ -372,7 +344,8 @@ function! s:onDebuggerStopped(mes)
 	else
 		call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
-	"call s:updateWatchWindow()
+	" request watches update	
+	call nodeinspect#watches#UpdateWatches()
 endfunction
 
 
@@ -381,7 +354,6 @@ function! s:onDebuggerHalted()
 	"call s:removeSign()
 	call s:clearBacktraceWindow('Debugger not running')
 endfunction
-
 
 
 " on receiving a message from the node bridge.
@@ -414,6 +386,8 @@ function! OnNodeMessage(channel, msgs)
 				echom "vim-node-inspect: failed to connect to remote host"
 			elseif mes["m"] == "nd_restartequired"
 				call s:NodeInspectStart(s:lastStartIsRunning, s:connectionTsap)
+			elseif mes["m"] == "nd_watchesresolved"
+				call nodeinspect#watches#OnWatchesResolved(mes['watches'])
 			else
 				echo "vim-node-inspect: unknown message "
 			endif
@@ -430,7 +404,7 @@ endfunction
 function! OnVimLeavePre(...)
 	" close the bridge gracefully in any case its still running
 	if s:initiated == 1
-		call s:sendEvent('{"m": "nd_kill"}')
+		call nodeinspect#utils#SendEvent('{"m": "nd_kill"}')
 		sleep 150m
 	endif
 	call OnNodeInspectExit()
@@ -446,9 +420,10 @@ function! OnNodeInspectExit(...)
 	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
 		execute "bd!"
 	endif
-	"if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
-		"execute "bd!"
-	"endif
+	let inspectWinId = nodeinspect#watches#GetWinId()
+	if inspectWinId != -1 && win_gotoid(inspectWinId) == 1
+		execute "bd!"
+	endif
 	call s:NodeInspectCleanup()
 endfunction
 
@@ -458,7 +433,7 @@ function! OnBufWritePost()
 	if s:initiated == 1
 		let filename = expand('%:p')
 		let remoteFile = s:getRemoteFilePath(filename)
-		call s:sendEvent('{"m": "nd_verifyrestart", "file":"' . remoteFile . '"}')
+		call nodeinspect#utils#SendEvent('{"m": "nd_verifyrestart", "file":"' . remoteFile . '"}')
 	endif
 endfunction
 
@@ -476,65 +451,40 @@ endfunction
 function! s:NodeInspectStepOver()
 	call s:removeSign()
 	call s:clearBacktraceWindow()
-	call s:sendEvent('{"m": "nd_next"}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_next"}')
 endfunction
 
 " step into
 function! s:NodeInspectStepInto()
 	call s:removeSign()
 	call s:clearBacktraceWindow()
-	call s:sendEvent('{"m": "nd_into"}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_into"}')
 endfunction
 
 " stop, kills node
 function! s:NodeInspectStop()
 	call s:removeSign()
 	call s:clearBacktraceWindow()
-	call s:sendEvent('{"m": "nd_kill"}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_kill"}')
 endfunction
 
 " run (continue)
 function! s:NodeInspectRun()
 	call s:removeSign()
 	call s:clearBacktraceWindow()
-	call s:sendEvent('{"m": "nd_continue"}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_continue"}')
 endfunction
 
 " step out
 function! s:NodeInspectStepOut()
 	call s:removeSign()
 	call s:clearBacktraceWindow()
-	call s:sendEvent('{"m": "nd_out"}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_out"}')
 endfunction
 
 " pause - stop a running script
 function! s:NodeInspectPause()
-	call s:sendEvent('{"m": "nd_pause"}')
-endfunction
-
-" connects to the bridge, to to 2s. 
-" returns 1 if connected successfully, otherwise 0
-function! s:ConnectToBridge()
-	let retries = 10
-	let connected = 0
-	while retries >= 0
-		sleep 200m
-		if has("nvim")
-			let s:channel = sockconnect("tcp", "localhost:9514", {"on_data": "OnNodeNvimMessage"})
-			if s:channel > 0
-				let connected = 1
-				break
-			endif
-		else
-			let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
-			if ch_status(s:channel) == "open"
-				let connected = 1
-				break
-			endif
-		endif
-		let retries -= 1
-	endwhile
-	return connected
+	call nodeinspect#utils#SendEvent('{"m": "nd_pause"}')
 endfunction
 
 
@@ -579,14 +529,12 @@ function! s:NodeInspectStart(start, tsap)
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
+		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Callstack"
 		let s:backtrace_win = win_getid()
 		set nonu
 		call s:clearBacktraceWindow()
 		" create inspect window
-		"execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile"
-		"let s:inspect_win = win_getid()
-		"set nonu
+		call nodeinspect#watches#CreateWatchWindow(s:start_win) 
 		" back to repl win
 		call win_gotoid(s:repl_win)
 		" is it with a filename or connection to host:port?
@@ -609,7 +557,7 @@ function! s:NodeInspectStart(start, tsap)
 
 		" wait for bridge conenction
 		sleep 200m
-		let connected = s:ConnectToBridge()
+		let connected = nodeinspect#utils#ConnectToBridge()
 		if connected == 0
 			" can't connect. exit.
 			echom 'cant connect to node-bridge'
@@ -619,7 +567,7 @@ function! s:NodeInspectStart(start, tsap)
 		" (node-inspect doesn't display anything in this case)
 		if s:connectionType == 'attach'
 			sleep 100m
-			call s:sendEvent('{"m": "nd_print", "txt":"Connected to '.s:connectionTsap.'\n"}')
+			call nodeinspect#utils#SendEvent('{"m": "nd_print", "txt":"Connected to '.s:connectionTsap.'\n"}')
 		endif
 	else
 		" remove all breakpoint, they will be resolved by node-inspect
@@ -627,13 +575,13 @@ function! s:NodeInspectStart(start, tsap)
 		sleep 150m
 		call s:removeSign()
 		call s:clearBacktraceWindow()
-		call s:sendEvent('{"m": "nd_restart"}')
+		call nodeinspect#utils#SendEvent('{"m": "nd_restart"}')
 		sleep 200m
 	endif
 
 	" send breakpoints, if any
 	sleep 150m
-	call s:sendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+	call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
 	if a:start == 1 && s:connectionType == 'program'
 		" not sleeping will send the events together
 		sleep 150m
@@ -641,7 +589,6 @@ function! s:NodeInspectStart(start, tsap)
 	endif
 
 endfunction
-
 
 
 " Callable functions / plugin API
@@ -686,6 +633,10 @@ function! nodeinspect#NodeInspectPause()
 endfunction
 
 function! nodeinspect#NodeInspectRun()
+	if &mod == 1
+		echom "Can't start while file is dirty, save the file first"
+		return
+	endif
 	let s:lastStartIsRunning = 1
 	if s:initiated == 0
     call s:NodeInspectStart(1, '')
@@ -703,6 +654,10 @@ function! nodeinspect#NodeInspectStop()
 endfunction
 
 function! nodeinspect#NodeInspectStart()
+	if &mod == 1
+		echom "Can't start while file is dirty, save the file first"
+		return
+	endif
 	let s:lastStartIsRunning = 0
 	if s:initiated == 0
 		call s:NodeInspectStart(0, '')
@@ -712,6 +667,10 @@ function! nodeinspect#NodeInspectStart()
 endfunction
 
 function! nodeinspect#NodeInspectConnect(tsap)
+	if &mod == 1
+		echom "Can't start while file is dirty, save the file first"
+		return
+	endif
 	if s:initiated == 1
 		echo "close running instance first"
 		return
@@ -720,7 +679,11 @@ function! nodeinspect#NodeInspectConnect(tsap)
 	call s:NodeInspectStart(0,a:tsap)
 endfunction
 
-"function! nodeinspect#NodeInspectAddWatch(watch)
-	"call s:NodeInspectAddWatch(a:watch)
-"endfunction
+function! nodeinspect#NodeInspectAddWatch()
+	call nodeinspect#watches#AddWatch()
+endfunction
+
+function! nodeinspect#NodeInspectRemoveWatch()
+	call nodeinspect#watches#RemoveWatch()
+endfunction
 

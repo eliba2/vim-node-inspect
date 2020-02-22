@@ -941,6 +941,40 @@ function createRepl(inspector, nvim_bridge_p) {
     selectedFrame = null;
   }
 
+	function resolveWatches(watches) {
+    if (Object.keys(watches).length == 0) {
+			return {};
+    }
+    const inspectValue = async (expr) => {
+			try {
+				let val = await evalInCurrentContext(expr);
+				if (val && val.subtype == 'error')
+					return "n\\a";
+				if (typeof val == 'object' && val.preview && val.preview.properties) {
+					let propertiesVal = '';
+					val.preview.properties.map(s => propertiesVal += `${s.name}: ${s.value} `);
+					return propertiesVal;
+				}
+				else
+					return val.value || "n\\a";
+			} catch (e) {
+        return "n\\a";
+			}
+		}
+    const lastIndex = watchedExpressions.length - 1;
+		let output = {};
+    return Promise.all(Object.keys(watches).map(inspectValue))
+      .then((values) => {
+        const lines = Object.keys(watches)
+          .map((expr, idx) => {
+						output[expr] = values[idx];
+          });
+      })
+      .then((valueList) => {
+        return output;
+      });
+	}
+
   Debugger.on('resumed', handleResumed);
 
   Debugger.on('breakpointResolved', handleBreakpointResolved);
@@ -1226,6 +1260,14 @@ function createRepl(inspector, nvim_bridge_p) {
 					let m = { m: 'nd_restartequired' };
 					nvim_bridge.send(m);
 				}
+				break;
+			case 'nd_updatewatches':
+				let watches = await resolveWatches(message.watches);
+				let m = { 
+					m: 'nd_watchesresolved',
+					watches,
+				};
+				nvim_bridge.send(m);
 				break;
 			default:
 				console.error("unknown message from vim",JSON.stringify(message));
