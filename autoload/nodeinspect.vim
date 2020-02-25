@@ -11,7 +11,7 @@ let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
 let s:breakpointsUnhandledBuffers = {}
-let s:breakpointsFile = s:plugin_path . '/breakpoints'
+let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:configuration = {}
 let s:configFileName = 'vim-node-config.json' 
 let s:lastStartIsRunning = 0
@@ -47,57 +47,45 @@ function! s:SignInit()
 endfunction
 
 
-" write configuration (breakpoints) file
+" write session file
 " it is serialized as a list of lines, each consist of
 " <file>#<line>,<line>...
-function! s:saveBreakpointsFile()
-	let breakpointList = []
-	for filename in keys(s:breakpoints)
-		let allLines = ''
-		for lineKey in keys(s:breakpoints[filename])
-			if allLines != ''
-				let allLines = allLines . ','
-			endif
-			let allLines = allLines . lineKey
-		endfor
-		let line = filename . '#' . allLines
-		call add(breakpointList, line)
-	endfor
-	call writefile(breakpointList, s:breakpointsFile)
+function! s:saveSessionFile()
+	let config = {}
+	let config['breakpoints'] = s:breakpoints
+	call writefile([json_encode(config)], s:sessionFile)
 endfunction
 
-" load breakpoints file. see above for description.
-function! s:loadBreakpointsFile()
-	" breakpoints file
-	if filereadable(s:breakpointsFile)
+" load session file.
+function! s:loadSessionFile()
+	if filereadable(s:sessionFile)
 		let workingDir = getcwd()
-		for fileLine in readfile(s:breakpointsFile, '')
-			let brkList = split(fileLine,"#")
-			let filename = brkList[0]
-			let allLines = split(brkList[1],',') 
-			" add breakpoints only if relevant to the current pwd.
-			if stridx(filename, workingDir) != -1
-				" load the buffer in the background if not loaded already
-				if bufloaded(filename) == 0
-					execute  "badd ".filename
-				endif
-				" adding to breakpoint list but not yet setting the breakpoints signs.
-				" this will be done in the bufenter autocmd
-				for line in allLines
-					"call s:addBreakpoint(filename, str2nr(line), 0)
-					let line = str2nr(line)
-					echom "adding breakpoint ".filename.":".line
-					" mostly will not be initiated.
-					if s:initiated == 0
-						let signId =	s:addBrkptSign(filename, line)
-						call s:addBreakpoint(filename, line, signId)
-					else 
-						let remoteFile = s:getRemoteFilePath(filename)
-						call nodeinspect#utils#SendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+		let configRaw = join(readfile(s:sessionFile, "\n"))
+		let config = json_decode(configRaw)
+		if has_key(config, "breakpoints")
+			" the breakpoint configuration is a key-value object, filname: {
+			" line:id, line:id ... }
+			for filename in keys(config["breakpoints"])
+				if stridx(filename, workingDir) != -1
+					" load the buffer in the background if not loaded already
+					if bufloaded(filename) == 0
+						execute  "badd ".filename
 					endif
-				endfor
-			endif
-		endfor
+					for lineStr in keys(config["breakpoints"][filename])
+						let line = str2nr(lineStr)
+						echom "adding breakpoint ".filename.":".line
+						" mostly will not be initiated.
+						if s:initiated == 0
+							let signId =	s:addBrkptSign(filename, line)
+							call s:addBreakpoint(filename, line, signId)
+						else 
+							let remoteFile = s:getRemoteFilePath(filename)
+							call nodeinspect#utils#SendEvent('{"m": "nd_addbrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
+						endif
+					endfor
+				endif
+			endfor
+		endif
 	endif
 endfunction
 
@@ -133,7 +121,7 @@ endfunction
 function! s:NodeInspectCleanup()
 	let s:initiated = 0
 	call s:removeSign()
-	call s:saveBreakpointsFile()
+	call s:saveSessionFile()
 	" close channel if available
 	call nodeinspect#utils#CloseChannel()
 endfunction
@@ -145,9 +133,9 @@ function! s:getLocalFilePath(file)
 		return a:file
 	endif
 	" files arrive relative(?) is so, add '/'
-	"let preFileStr = ''
+	let preFileStr = ''
 	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:configuration["remoteRoot"]) > 1 && s:configuration["remoteRoot"][0:0] == '/'
-		let preFileStr = '/'
+		"let preFileStr = '/'
 	"endif
 	" strip file of its path, add it to the local
 	let localFile = substitute(preFileStr.a:file,	s:configuration["remoteRoot"], s:configuration["localRoot"], "")
@@ -231,7 +219,7 @@ function! s:breakpointResolved(file, line)
 		let found = 0
 		let loaded = 0
 		for buf in getbufinfo()
-			if buf.name == a:file
+			if buf.name == localFile
 				let found = 1
 				let loaded = 1
 				break
@@ -240,9 +228,9 @@ function! s:breakpointResolved(file, line)
 		if found == 0
 			" check if to load the file or not
 			let workingDir = getcwd()
-			if stridx(a:file, workingDir) != -1
-				if bufloaded(a:file) == 0
-					execute  "badd ".a:file
+			if stridx(localFile, workingDir) != -1
+				if bufloaded(localFile) == 0
+					execute  "badd ".localFile
 				endif
 				let loaded = 1
 			endif
@@ -441,7 +429,7 @@ endfunction
 " called upon startup, setting signs if any.
 function! nodeinspect#OnNodeInspectEnter()
 	call s:SignInit()
-	call s:loadBreakpointsFile()
+	call s:loadSessionFile()
 endfunction
 
 
