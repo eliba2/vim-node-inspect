@@ -5,7 +5,7 @@ Interactive node debugger for (n)vim.
 This plugin adds node debugging capabilities to vim with interactive CLI. Under the hood it wraps a modified version of node-inspect *(https://github.com/nodejs/node-inspect)*.
 
 
-[![asciicast](https://asciinema.org/a/292793.svg)](https://asciinema.org/a/292793)
+[![asciicast](https://asciinema.org/a/NOCL8Fc3LcQjVDD0CIR08I698.svg)](https://asciinema.org/a/NOCL8Fc3LcQjVDD0CIR08I698)
 
 ## Requirements
 Vim**8.1+**/Recent Neovim.
