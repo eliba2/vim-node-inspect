@@ -16,7 +16,6 @@ function s:Draw()
 		" execute "set modifiable"
 		execute "%d"
 		" execute "set nomodifiable"
-		
 		" loop here over all watches and update their values
 		for watch in keys(s:watches)
 			call append(getline('$'), watch."      ".s:watches[watch])
@@ -53,11 +52,24 @@ function s:RecalcWatchesKeys()
 endfunction
 
 
-
 function! s:updateWatches()
 	if len(keys(s:watches)) > 0
 		let watchesJson = json_encode(s:watches)
 		call nodeinspect#utils#SendEvent('{"m": "nd_updatewatches", "watches":' . watchesJson . '}')
+	endif
+endfunction
+
+
+function! s:addToWatchWin(watch)
+	if len(a:watch) > 0
+		let cur_win = win_getid()
+		let gotoResult = win_gotoid(s:inspect_win)
+		if gotoResult == 1
+			call append(getline('$'), a:watch)
+			call s:RecalcWatchesKeys()
+			call s:updateWatches()
+			call win_gotoid(cur_win)
+		endif
 	endif
 endfunction
 
@@ -73,9 +85,22 @@ function! nodeinspect#watches#OnWatchesResolved(watches)
 	endif
 endfunction
 
-
+" will return the watches object, key - value
 function! nodeinspect#watches#GetWatches()
 	return s:watches
+endfunction
+
+
+" will return the watches object, key : 1
+" used to save watches session
+function! nodeinspect#watches#GetWatchesKeys()
+	let watchKeys = {}
+	if len(keys(s:watches)) > 0
+		for watch in keys(s:watches)
+			let watchKeys[watch] = 1
+		endfor
+	endif
+	return watchKeys
 endfunction
 
 
@@ -102,20 +127,21 @@ function! nodeinspect#watches#CreateWatchWindow(startWin)
 endfunction
 
 
-" add the word under the cursor to the watch window
-function! nodeinspect#watches#AddWatch()
-	let wordUnderCursor = expand("<cword>")
-	if len(wordUnderCursor) > 0
-		let cur_win = win_getid()
-		let gotoResult = win_gotoid(s:inspect_win)
-		if gotoResult == 1
-			call append(getline('$'), wordUnderCursor)
-			call s:RecalcWatchesKeys()
-			call s:updateWatches()
-			call win_gotoid(cur_win)
-		endif
+" add watches, in a bulk
+function! nodeinspect#watches#AddBulk(watches)
+	if len(keys(a:watches)) > 0
+		for watch in keys(a:watches)
+			"echom "restoring watch ".watch
+			let s:watches[watch] = 'n/a'
+		endfor
 	endif
+endfunction
 
+
+" add the word under the cursor to the watch window
+function! nodeinspect#watches#AddCurrentWordAsWatch()
+	let wordUnderCursor = expand("<cword>")
+	call s:addToWatchWin(wordUnderCursor)
 endfunction
 
 

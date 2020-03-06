@@ -10,6 +10,7 @@ let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
+let s:session = {}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:configuration = {}
@@ -47,17 +48,17 @@ function! s:SignInit()
 endfunction
 
 
-" write session file
-" it is serialized as a list of lines, each consist of
-" <file>#<line>,<line>...
+" write session file, json format
 function! s:saveSessionFile()
 	let config = {}
 	let config['breakpoints'] = s:breakpoints
+	let config['watches'] = nodeinspect#watches#GetWatchesKeys()
 	call writefile([json_encode(config)], s:sessionFile)
 endfunction
 
 " load session file.
 function! s:loadSessionFile()
+	let s:session["watches"] = {}
 	if filereadable(s:sessionFile)
 		let workingDir = getcwd()
 		let configRaw = join(readfile(s:sessionFile, "\n"))
@@ -85,6 +86,9 @@ function! s:loadSessionFile()
 					endfor
 				endif
 			endfor
+		endif
+		if has_key(config, "watches")
+			let s:session["watches"] = config["watches"]
 		endif
 	endif
 endfunction
@@ -551,7 +555,7 @@ function! s:NodeInspectStart(start, tsap)
 			echom 'cant connect to node-bridge'
 			return
 		endif
-		" send a conencted message, when connecting to a remote instance
+		" send a connected message, when connecting to a remote instance
 		" (node-inspect doesn't display anything in this case)
 		if s:connectionType == 'attach'
 			sleep 100m
@@ -570,6 +574,11 @@ function! s:NodeInspectStart(start, tsap)
 	" send breakpoints, if any
 	sleep 150m
 	call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+	" redraw the watch window; draws any watches added from the session
+	for watch in keys(s:session["watches"])
+		call nodeinspect#watches#AddBulk(s:session["watches"])
+	endfor
+
 	if a:start == 1 && s:connectionType == 'program'
 		" not sleeping will send the events together
 		sleep 150m
@@ -668,10 +677,6 @@ function! nodeinspect#NodeInspectConnect(tsap)
 endfunction
 
 function! nodeinspect#NodeInspectAddWatch()
-	call nodeinspect#watches#AddWatch()
-endfunction
-
-function! nodeinspect#NodeInspectRemoveWatch()
-	call nodeinspect#watches#RemoveWatch()
+	call nodeinspect#watches#AddCurrentWordAsWatch()
 endfunction
 
