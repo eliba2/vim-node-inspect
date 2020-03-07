@@ -53,9 +53,12 @@ endfunction
 
 
 function! s:updateWatches()
-	if len(keys(s:watches)) > 0
-		let watchesJson = json_encode(s:watches)
-		call nodeinspect#utils#SendEvent('{"m": "nd_updatewatches", "watches":' . watchesJson . '}')
+	" should be called only when available
+	if nodeinspect#GetStatus() == 1
+		if len(keys(s:watches)) > 0
+			let watchesJson = json_encode(s:watches)
+			call nodeinspect#utils#SendEvent('{"m": "nd_updatewatches", "watches":' . watchesJson . '}')
+		endif
 	endif
 endfunction
 

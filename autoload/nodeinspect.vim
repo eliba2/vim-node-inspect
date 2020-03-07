@@ -1,4 +1,4 @@
-let s:initiated = 0
+let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited)
 let s:connectionType = ''
 let s:connectionTsap = ''
 let s:plugin_path = expand('<sfile>:h:h')
@@ -76,7 +76,7 @@ function! s:loadSessionFile()
 						let line = str2nr(lineStr)
 						echom "adding breakpoint ".filename.":".line
 						" mostly will not be initiated.
-						if s:initiated == 0
+						if s:status != 1
 							let signId =	s:addBrkptSign(filename, line)
 							call s:addBreakpoint(filename, line, signId)
 						else 
@@ -123,7 +123,7 @@ endfunction
 
 " called on removal of the node bridge.
 function! s:NodeInspectCleanup()
-	let s:initiated = 0
+	let s:status = 0
 	call s:removeSign()
 	call s:saveSessionFile()
 	" close channel if available
@@ -207,7 +207,7 @@ function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
 			endif
 		endfor
 	endfor
-	if a:inspectNotify == 1 && s:initiated == 1
+	if a:inspectNotify == 1 && s:status == 1
 		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
 		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
 	endif
@@ -268,7 +268,7 @@ function! s:NodeInspectToggleBreakpoint()
 		" remove sign
 		call s:removeBrkptSign(signId, file)
 		" send event only if node-inspect was started
-		if s:initiated == 1
+		if s:status == 1
 			" remote file might be different according to configurations.
 			let remoteFile = s:getRemoteFilePath(file)
 			call nodeinspect#utils#SendEvent('{"m": "nd_removebrkpt", "file":"' . remoteFile . '", "line":' . line . '}')
@@ -276,7 +276,7 @@ function! s:NodeInspectToggleBreakpoint()
 	else
 		" request to add this sign. if node inspect was not started yet, add it to
 		" the list
-		if s:initiated == 0
+		if s:status != 1
 			let signId =	s:addBrkptSign(file, line)
 			call s:addBreakpoint(file, line, signId)
 		else 
@@ -292,7 +292,7 @@ endfunction
 " or a user message
 function! s:clearBacktraceWindow(...)
 	if a:0 == 0
-		let message = 'Debugger not stopped'
+		let message = 'Running'
 	else
 		let message = a:1
 	endif
@@ -314,7 +314,8 @@ function! s:onDebuggerStopped(mes)
 	" open the relevant file only if it can be found locally
 	" translate to local in case of remote connection
 	let localFile = s:getLocalFilePath(a:mes["file"])
-	if filereadable(localFile)
+	let readable = filereadable(localFile)
+	if readable && s:session["start"] == 0
 		" print backtrace
 		let gotoResult = win_gotoid(s:backtrace_win)
 		if gotoResult == 1
@@ -334,7 +335,9 @@ function! s:onDebuggerStopped(mes)
 		execute ":" . a:mes["line"]
 		call s:addSign(localFile, a:mes["line"])
 	else
-		call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
+		if !readable
+			call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
+		endif
 	endif
 	" request watches update	
 	call nodeinspect#watches#UpdateWatches()
@@ -344,7 +347,8 @@ endfunction
 " called when the debuggger session was stopped unintentionally (js error?)
 function! s:onDebuggerHalted()
 	"call s:removeSign()
-	call s:clearBacktraceWindow('Debugger not running')
+	let s:status = 2
+	call s:clearBacktraceWindow('Session ended')
 endfunction
 
 
@@ -395,7 +399,7 @@ endfunction
 " vim global exit handler
 function! OnVimLeavePre(...)
 	" close the bridge gracefully in any case its still running
-	if s:initiated == 1
+	if s:status != 0
 		call nodeinspect#utils#SendEvent('{"m": "nd_kill"}')
 		sleep 150m
 	endif
@@ -422,7 +426,7 @@ endfunction
 
 " when saving a buffer during a debugg session, session should be restarted.
 function! OnBufWritePost()
-	if s:initiated == 1
+	if s:status == 1
 		let filename = expand('%:p')
 		let remoteFile = s:getRemoteFilePath(filename)
 		call nodeinspect#utils#SendEvent('{"m": "nd_verifyrestart", "file":"' . remoteFile . '"}')
@@ -481,6 +485,9 @@ endfunction
 
 
 " starts node-inspect. connects to the node bridge.
+" start (0/1) - start running, do not break on the first line (not supported
+" by bridge, simulated in vim)
+" tsap - conenction paramters, if any
 function! s:NodeInspectStart(start, tsap)
 	" must start with a file. at least for now.
 	if bufname('') == '' && a:tsap == ''
@@ -505,11 +512,13 @@ function! s:NodeInspectStart(start, tsap)
 	let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
 	" that saves me from deepcopy
 	let remoteBreakpointsJson = json_encode(remoteBreakpoints)
+	" set start, simulates start-run in vim
+	let s:session["start"] = a:start
 
 	" register global on exit, add signs 
-	if s:initiated == 0
+	if s:status == 0
 		" start
-		let s:initiated = 1
+		let s:status = 1
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:NodeInspectRemoveAllBreakpoints(0)
 		let s:start_win = win_getid()
@@ -562,6 +571,8 @@ function! s:NodeInspectStart(start, tsap)
 			call nodeinspect#utils#SendEvent('{"m": "nd_print", "txt":"Connected to '.s:connectionTsap.'\n"}')
 		endif
 	else
+		" set the status to running, might be ended(2)
+		let s:status = 1
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:NodeInspectRemoveAllBreakpoints(0)
 		sleep 150m
@@ -584,7 +595,15 @@ function! s:NodeInspectStart(start, tsap)
 		sleep 150m
 		call s:NodeInspectRun()
 	endif
+	" reset start
+	let s:session["start"] = 0
 
+endfunction
+
+" get the current status (0 - not initialized, 1 - running, 2 - ended (bridge
+" exists but no node). Used by modules.
+function! s:GetStatus()
+	return s:status
 endfunction
 
 
@@ -598,7 +617,7 @@ function! nodeinspect#NodeInspectRemoveAllBreakpoints()
 endfunction
 
 function! nodeinspect#NodeInspectStepOver()
-	if s:initiated == 0
+	if s:status != 1
 		echo "node-inspect not started"
 		return
 	endif
@@ -606,7 +625,7 @@ function! nodeinspect#NodeInspectStepOver()
 endfunction
 
 function! nodeinspect#NodeInspectStepInto()
-	if s:initiated == 0
+	if s:status != 1
 		echo "node-inspect not started"
 		return
 	endif
@@ -614,7 +633,7 @@ function! nodeinspect#NodeInspectStepInto()
 endfunction
 
 function! nodeinspect#NodeInspectStepOut()
-	if s:initiated == 0
+	if s:status != 1
 		echo "node-inspect not started"
 		return
 	endif
@@ -622,7 +641,7 @@ function! nodeinspect#NodeInspectStepOut()
 endfunction
 
 function! nodeinspect#NodeInspectPause()
-	if s:initiated == 0
+	if s:status != 1
 		echo "node-inspect not started"
 		return
 	endif
@@ -635,7 +654,7 @@ function! nodeinspect#NodeInspectRun()
 		return
 	endif
 	let s:lastStartIsRunning = 1
-	if s:initiated == 0
+	if s:status != 1
     call s:NodeInspectStart(1, '')
 	else
 		call s:NodeInspectRun()
@@ -643,7 +662,7 @@ function! nodeinspect#NodeInspectRun()
 endfunction
 
 function! nodeinspect#NodeInspectStop()
-	if s:initiated == 0
+	if s:status != 1
 		echo "node-inspect not started"
 		return
 	endif
@@ -656,7 +675,7 @@ function! nodeinspect#NodeInspectStart()
 		return
 	endif
 	let s:lastStartIsRunning = 0
-	if s:initiated == 0
+	if s:status != 1
 		call s:NodeInspectStart(0, '')
 	else
 		call s:NodeInspectStart(0, s:connectionTsap)
@@ -668,7 +687,7 @@ function! nodeinspect#NodeInspectConnect(tsap)
 		echom "Can't start while file is dirty, save the file first"
 		return
 	endif
-	if s:initiated == 1
+	if s:status == 1
 		echo "close running instance first"
 		return
 	endif
@@ -678,5 +697,9 @@ endfunction
 
 function! nodeinspect#NodeInspectAddWatch()
 	call nodeinspect#watches#AddCurrentWordAsWatch()
+endfunction
+
+function! nodeinspect#GetStatus()
+	return s:GetStatus()
 endfunction
 
