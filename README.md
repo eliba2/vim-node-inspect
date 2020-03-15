@@ -18,31 +18,65 @@ Plug 'eliba2/vim-node-inspect'
 ```
 
 ## How to use
-Either start debugging a local js file (via NodeInspectStart or NodeInspectRun) or connect to a running instance using NodeInspectConnect. In the later case the target must start with --inspect (e.g. node --inspect server.js).
-To run arbitrary js code in the debugger use "exec".
+Either start a node script or attach to an already running script. Both can be done manually (NodeIndpectStart/NodeInspectRun) or using the configuration file vim-node-config.json. The later is encouraged.
 
+### Starting Manually ###
+
+Either start debugging a local js file (via NodeInspectStart or NodeInspectRun) or connect to a running instance using NodeInspectConnect. In the later case the target must start with --inspect (e.g. node --inspect server.js). If a configuration file is present, it takes precedence.
+
+### Using the configuration file ###
+
+Use the configuration file to define the starting method. Create a file named "vim-node-config.json" in the current working directory. The format is json, and the available options are:
+
+**"request"** - either "launch" or "attach". The former is for executing a script. The second is for connecting to a running node instance.
+
+**"program"** - in the case of "launch", this is the script's filename and must be present.
+
+A sample configuration for launch would be:
+```
+{
+	"request": "launch",
+	"program": "/Users/eli/Tests/test.js"
+}
+```
+
+
+**"address"** - in the case of "attach", this is the address to connect to. Can be omitted, in this case it defaults to "127.0.0.1".
+
+**"port"** - in the case of "attach", this is the port to connect to. Must be present.
+
+A sample configuration for attach would be:
+
+```
+{
+	"request": "attach",
+	"port": 9229
+}
+```
+
+## Available Commands
 
 The following commands are available:
 
-NodeInspectStart - Starts debugger, paused
+**NodeInspectStart** - Starts debugger, paused
 
-NodeInspectRun - Continue / Start and run immediatly
+**NodeInspectRun** - Continue / Start and run immediatly
 
-NodeInspectConnect host:port - Connect to a running instance
+**NodeInspectConnect** host:port - Connect to a running instance
 
-NodeInspectStepOver - Step over
+**NodeInspectStepOver** - Step over
 
-NodeInspectStepInto - Step into
+**NodeInspectStepInto** - Step into
 
-NodeInspectStepOut - Step out
+**NodeInspectStepOut** - Step out
 
-NodeInspectStop - Stop debugging (and kill the node instance)
+**NodeInspectStop** - Stop debugging (and kill the node instance)
 
-NodeInspectToggleBreakpoint - Toggle breakpoint
+**NodeInspectToggleBreakpoint** - Toggle breakpoint
 
-NodeInspectRemoveAllBreakpoints - Removes all breakpoints
+**NodeInspectRemoveAllBreakpoints** - Removes all breakpoints
 
-NodeInspectAddWatch - Add the word under the cursor to the watch window
+**NodeInspectAddWatch** - Add the word under the cursor to the watch window
 
 
 There are no default bindings; the following is added for convinience:
