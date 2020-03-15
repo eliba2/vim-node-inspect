@@ -1,6 +1,4 @@
 let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited)
-let s:connectionType = ''
-let s:connectionTsap = ''
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
 let s:repl_win = -1
@@ -15,7 +13,6 @@ let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:configuration = {}
 let s:configFileName = 'vim-node-config.json' 
-let s:lastStartIsRunning = 0
 let s:msgDelimiter = '&&'
 
 autocmd VimLeavePre * call OnVimLeavePre()
@@ -93,11 +90,25 @@ function! s:loadSessionFile()
 	endif
 endfunction
 
+
+function! s:removeSessionKeys(...)
+	for uvar in a:000
+		if has_key(s:session, uvar)
+			call remove(s:session, uvar)
+		endif
+	endfor
+endfunction
+
+
 " try and load the config file; it migth not exist, in this case use the
-" defaults.
+" defaults. returns 0 on success, !0 on failure.
 function! s:LoadConfigFile()
+	let s:configuration = {}
 	let configFilePath = getcwd() . '/' . s:configFileName
 	let fullFile = ''
+	" clear previous sessoin config
+	call s:removeSessionKeys("localRoot","remoteRoot")
+
 	if filereadable(configFilePath)
 		let lines = readfile(configFilePath)
 		for line in lines
@@ -105,17 +116,92 @@ function! s:LoadConfigFile()
 		endfor
 		" loaded the entire file, parse it to object
 		let configObj = json_decode(fullFile)
-		if type(configObj) == 4 && has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
-			let s:configuration["localRoot"] = configObj["localRoot"]
-			let s:configuration["remoteRoot"] = configObj["remoteRoot"]
-			" add trailing backslash if not present. it will normalize both inputs
-			" in case the user add one with and one without
-			if s:configuration["localRoot"][-1:-1] != '/' 
-				let s:configuration["localRoot"] = s:configuration["localRoot"] . '/'
+		if type(configObj) == 4 
+			if has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
+				let s:configuration["localRoot"] = configObj["localRoot"]
+				let s:configuration["remoteRoot"] = configObj["remoteRoot"]
+				" add trailing backslash if not present. it will normalize both inputs
+				" in case the user add one with and one without
+				if s:configuration["localRoot"][-1:-1] != '/' 
+					let s:configuration["localRoot"] = s:configuration["localRoot"] . '/'
+				endif
+				if s:configuration["remoteRoot"][-1:-1] != '/' 
+					let s:configuration["remoteRoot"] = s:configuration["remoteRoot"] . '/'
+				endif
 			endif
-			if s:configuration["remoteRoot"][-1:-1] != '/' 
-				let s:configuration["remoteRoot"] = s:configuration["remoteRoot"] . '/'
+			if has_key(configObj,"request") == 1
+				if configObj["request"] == 'attach' || configObj["request"] == 'launch'
+					let s:configuration["request"] = configObj["request"]
+				else
+					echom "error reading launch in vim-node-inspect"
+					return 1
+				endif
 			endif
+			if has_key(configObj,"program") == 1
+				echom "type ".type(configObj["program"])
+				if type(configObj["program"]) == 1
+					let s:configuration["program"] = configObj["program"]
+				else
+					echom "error reading program in vim-node-inspect"
+					return 1
+				endif
+			endif
+			if has_key(configObj,"address") == 1
+				if type(configObj["address"]) == 1
+					let s:configuration["address"] = configObj["address"]
+				else
+					echom "error reading address in vim-node-inspect"
+					return 1
+				endif
+			endif
+			if has_key(configObj,"port") == 1
+				if type(configObj["port"]) == 0
+					let s:configuration["port"] = configObj["port"]
+				else
+					echom "error reading port in vim-node-inspect"
+					return 1
+				endif
+			endif
+
+			" validate config and setup session
+			if has_key(s:configuration, "request") == 1 
+				if s:configuration["request"] == 'attach' 
+					if has_key(s:configuration, "port") == 0
+						echom "vim-node-inspect config error, attach without a port"
+						return 1
+					else
+						let s:session["request"] = s:configuration["request"]
+						let s:session["port"] = s:configuration["port"]
+						" address defaults to localhost
+						if has_key(s:configuration, "address")
+							let s:session["address"] = s:configuration["address"]
+						else
+							let s:session["address"] = "127.0.0.1"
+						endif
+					endif
+				endif
+				if s:configuration["request"] == 'launch' 
+					if has_key(s:configuration, "program") == 0
+						echom "vim-node-inspect config error, launch without a program"
+						return 1
+					else
+						let s:session["request"] = s:configuration["request"]
+						let s:session["program"] = s:configuration["program"]
+					endif
+				endif
+			endif
+			if (has_key(s:configuration, "localRoot") == 1 || has_key(s:configuration, "remoteRoot") == 1)
+				if ((has_key(s:configuration, "localRoot") == 1 && has_key(s:configuration, "remoteRoot") == 0) || (has_key(s:configuration, "localRoot") == 0 && has_key(s:configuration, "remoteRoot") == 1))
+					echom 'vim-node-inspect directories set error'
+					return 1
+				else
+					let s:session["localRoot"] = s:configuration["localRoot"]
+					let s:session["remoteRoot"] = s:configuration["remoteRoot"]
+				endif
+			endif
+		else
+			echom 'error reading vim-node-config.json, not a valid json'
+			return 1
 		endif
 	endif
 endfunction
@@ -133,7 +219,7 @@ endfunction
 
 " if configuration applies, get the local file path
 function! s:getLocalFilePath(file)
-	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
+	if has_key(s:session,"localRoot") == 0 || has_key(s:session,"remoteRoot") == 0
 		return a:file
 	endif
 	" files arrive relative(?) is so, add '/'
@@ -142,7 +228,7 @@ function! s:getLocalFilePath(file)
 		"let preFileStr = '/'
 	"endif
 	" strip file of its path, add it to the local
-	let localFile = substitute(preFileStr.a:file,	s:configuration["remoteRoot"], s:configuration["localRoot"], "")
+	let localFile = substitute(preFileStr.a:file,	s:session["remoteRoot"], s:session["localRoot"], "")
 	return localFile
 endfunction
 
@@ -151,18 +237,18 @@ endfunction
 
 " if configuration applies, get the remote file path
 function! s:getRemoteFilePath(file)
-	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
+	if has_key(s:session,"localRoot") == 0 || has_key(s:session,"remoteRoot") == 0
 		return a:file
 	endif
 	" strip file of its path, add it to the remote
-	let remoteFile = substitute(a:file,	s:configuration["localRoot"], s:configuration["remoteRoot"], "")
+	let remoteFile = substitute(a:file,	s:session["localRoot"], s:session["remoteRoot"], "")
 	return remoteFile
 endfunction
 
 " if configuration applies, get the breakpoints object normalized according to
 " the remote path.
 function! s:getRemoteBreakpointsObj(breakpoints)
-	if has_key(s:configuration,"localRoot") == 0 || has_key(s:configuration,"remoteRoot") == 0
+	if has_key(s:session,"localRoot") == 0 || has_key(s:session,"remoteRoot") == 0
 		return a:breakpoints
 	endif
 	let remoteBreakpoints = {}
@@ -381,7 +467,8 @@ function! OnNodeMessage(channel, msgs)
 			elseif mes["m"] == "nd_sockerror"
 				echom "vim-node-inspect: failed to connect to remote host"
 			elseif mes["m"] == "nd_restartequired"
-				call s:NodeInspectStart(s:lastStartIsRunning, s:connectionTsap)
+				let s:session["start"] = s:session["lastStart"]
+				call s:NodeInspectStart()
 			elseif mes["m"] == "nd_watchesresolved"
 				call nodeinspect#watches#OnWatchesResolved(mes['watches'])
 			else
@@ -488,33 +575,21 @@ endfunction
 " start (0/1) - start running, do not break on the first line (not supported
 " by bridge, simulated in vim)
 " tsap - conenction paramters, if any
-function! s:NodeInspectStart(start, tsap)
-	" must start with a file. at least for now.
-	if bufname('') == '' && a:tsap == ''
+function! s:NodeInspectStart()
+	" load configuration. if execution is specified there it shall be used.
+	if s:LoadConfigFile() != 0
+		return
+	endif
+	" if app, must start with a file
+	if bufname('') == '' && s:configuration["request"] == "launch"
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
-
-	" load configuration or remove it if needed. This will remove the entire
-	" configuraton; its ok for now as it holds only connection related stuff
-	if a:tsap == ''
-		let s:connectionType = 'program'
-		let s:connectionTsap = ''
-		let s:configuration = {}
-	else
-		let s:connectionTsap = a:tsap
-		let s:connectionType = 'attach'
-		call s:LoadConfigFile()
-	endif
-
 	" remove breakpoints if any, they will be re-invalidated after the debugger
 	" will (re)start.
 	let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
 	" that saves me from deepcopy
 	let remoteBreakpointsJson = json_encode(remoteBreakpoints)
-	" set start, simulates start-run in vim
-	let s:session["start"] = a:start
-
 	" register global on exit, add signs 
 	if s:status == 0
 		" start
@@ -522,9 +597,9 @@ function! s:NodeInspectStart(start, tsap)
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:NodeInspectRemoveAllBreakpoints(0)
 		let s:start_win = win_getid()
-		if s:connectionType == 'program'
-			let file = expand('%:p')
-		endif
+		"if s:connectionType == 'program'
+			"let file = expand('%:p')
+		"endif
 		" create bottom buffer, switch to it
 		execute "bo ".winheight(s:start_win)/3."new"
 		let s:repl_win = win_getid()
@@ -538,18 +613,18 @@ function! s:NodeInspectStart(start, tsap)
 		call nodeinspect#watches#CreateWatchWindow(s:start_win) 
 		" back to repl win
 		call win_gotoid(s:repl_win)
-		" is it with a filename or connection to host:port?
-		if s:connectionType == 'program'
+		" start according to settings
+		if s:session["request"] == "launch"
 			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'on_exit': 'OnNodeInspectExit'})"
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["program"] . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . file . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["program"] . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		else
 			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:connectionTsap . "', {'on_exit': 'OnNodeInspectExit'})"
+				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["address"].":".s:session["port"] . "', {'on_exit': 'OnNodeInspectExit'})"
 			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:connectionTsap . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
+				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["address"].":".s:session["port"] . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		endif
 
@@ -566,9 +641,9 @@ function! s:NodeInspectStart(start, tsap)
 		endif
 		" send a connected message, when connecting to a remote instance
 		" (node-inspect doesn't display anything in this case)
-		if s:connectionType == 'attach'
+		if s:session["request"] == "attach"
 			sleep 100m
-			call nodeinspect#utils#SendEvent('{"m": "nd_print", "txt":"Connected to '.s:connectionTsap.'\n"}')
+			call nodeinspect#utils#SendEvent('{"m": "nd_print", "txt":"Connected to '.s:session["port"].'\n"}')
 		endif
 	else
 		" set the status to running, might be ended(2)
@@ -590,7 +665,7 @@ function! s:NodeInspectStart(start, tsap)
 		call nodeinspect#watches#AddBulk(s:session["watches"])
 	endfor
 
-	if a:start == 1 && s:connectionType == 'program'
+	if s:session["start"] == 1 && s:session["request"] == "launch"
 		" not sleeping will send the events together
 		sleep 150m
 		call s:NodeInspectRun()
@@ -653,9 +728,13 @@ function! nodeinspect#NodeInspectRun()
 		echom "Can't start while file is dirty, save the file first"
 		return
 	endif
-	let s:lastStartIsRunning = 1
+	let s:session["lastStart"] = 1
 	if s:status != 1
-    call s:NodeInspectStart(1, '')
+		let s:session["start"] = 1
+		let s:session["port"] = -1
+		let s:session["request"] = "launch"
+		let s:session["program"] = expand('%:p')
+    call s:NodeInspectStart()
 	else
 		call s:NodeInspectRun()
 	endif
@@ -674,15 +753,17 @@ function! nodeinspect#NodeInspectStart()
 		echom "Can't start while file is dirty, save the file first"
 		return
 	endif
-	let s:lastStartIsRunning = 0
+	let s:session["lastStart"] = 0
 	if s:status != 1
-		call s:NodeInspectStart(0, '')
-	else
-		call s:NodeInspectStart(0, s:connectionTsap)
+		let s:session["start"] = 0
+		let s:session["port"] = -1
+		let s:session["request"] = "launch"
+		let s:session["program"] = expand('%:p')
+		call s:NodeInspectStart()
 	endif
 endfunction
 
-function! nodeinspect#NodeInspectConnect(tsap)
+function! nodeinspect#NodeInspectConnect(fullAdress)
 	if &mod == 1
 		echom "Can't start while file is dirty, save the file first"
 		return
@@ -691,8 +772,17 @@ function! nodeinspect#NodeInspectConnect(tsap)
 		echo "close running instance first"
 		return
 	endif
-	let s:lastStartIsRunning = 0
-	call s:NodeInspectStart(0,a:tsap)
+	" break the full address into address/port
+	let addressParts = split(a:fullAdress, ":")
+	if len(addressParts) != 2
+		echo "vim-node-inspect: bad address"
+	endif
+	let s:session["address"] = addressParts[0]
+	let s:session["port"] = addressParts[1]
+	let s:session["request"] = "attach"
+	let s:session["lastStart"] = 0
+	let s:session["start"] = 0
+	call s:NodeInspectStart()
 endfunction
 
 function! nodeinspect#NodeInspectAddWatch()

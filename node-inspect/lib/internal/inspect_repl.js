@@ -661,7 +661,11 @@ function createRepl(inspector, nvim_bridge_p) {
       knownBreakpoints.push({ breakpointId, location });
     }
 		// notify vim the breakpoint was resolved
-		let m = { m: 'nd_brk_resolved', file: location.scriptUrl, line: location.lineNumber + 1 };
+		let resolveFile = location.scriptUrl;
+		if (location.scriptUrl.indexOf("file://") == 0) {
+			resolveFile = location.scriptUrl.slice(7);
+		}
+		let m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber + 1 };
 		nvim_bridge.send(m);
   }
 
