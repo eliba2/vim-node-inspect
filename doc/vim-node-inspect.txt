@@ -1,0 +1,140 @@
+*vim-node-inspect* Interactive node debugger
+
+
+       _                                 _            
+__   _(_)_ __ ___        _ __   ___   __| | ___       
+\ \ / / | '_ ` _ \ _____| '_ \ / _ \ / _` |/ _ \_____ 
+ \ V /| | | | | | |_____| | | | (_) | (_| |  __/_____|
+  \_/ |_|_| |_| |_|     |_| |_|\___/ \__,_|\___|      
+                                                      
+ _                           _   
+(_)_ __  ___ _ __   ___  ___| |_ 
+| | '_ \/ __| '_ \ / _ \/ __| __|
+| | | | \__ \ |_) |  __/ (__| |_ 
+|_|_| |_|___/ .__/ \___|\___|\__|
+            |_|                  
+
+Interactive Node debugger for (n)vim	
+
+
+Author:  Eli E. Babila (elibabila@gmail.com)
+License: MIT (see VimNodeInspectLicense)
+																														
+
+
+Introduction                             *VimNodeInspectIntroduction*
+
+Debug node sctipts from (n)vim. Under the hood it uses a modified version of node-inspect (https://github.com/nodejs/node-inspect).
+
+
+====================================================================
+CONTENTS                                            *VimNodeInspectContents*
+
+    1. Requirements ............................. |VimNodeInspectRequirements|
+    2. Starting and stopping .................... |VimNodeInspectStarting|
+    3. vim-node-inspect.json config file ........ |VimNodeInspectConfiguration|
+    4. Setting breakpoints....................... |VimNodeInspectBreakpoints|
+    5. Watches................................... |VimNodeInspectWatches|
+    6. Debugging commands........................ |VimNodeInspectCommands|
+    7. Limitation................................ |VimNodeInspectLimitation|
+    8. License................................... |VimNodeInspectLicense|
+
+
+
+
+====================================================================
+Requirements                             *VimNodeInspectRequirements*
+
+Vim 8.1 / recent Neovim and node in the path.
+
+
+
+====================================================================
+Starting and stopping                    *VimNodeInspectStarting*
+
+Start debugging by either running a node script or by attaching to a running script. Both options can be executed manually or automated by using a configuration file. The later in encouraged. See VimNodeInspectConfiguration.
+
+NodeIndpectStart - will execute node <buffer> using the current buffer or the script defined in the configuration, and will break on the first instruction
+NodeInspectRun - Either starts as above without stopping on the initial instrution, or, continue a stopped execution
+NodeInspectConnect host:port - Connect to a running instance in host:port or to the address defined in the configuration
+
+*Note* node must be started with --inspect when connecting to a running container. See https://nodejs.org/en/docs/guides/debugging-getting-started/ .
+
+To stop debugging use NodeInspectStop. It will kill the node instance in case or running a script and drop the connection in case of connecting to a running script. To list is as the others,
+
+NodeInspectStop - Stop debugging (and kill the node instance)
+
+
+
+====================================================================
+vim-node-inspect.json configuration file	*VimNodeInspectConfiguration*
+
+The configuration file name is 'vim-node-inspect.json' and the plugin searches for it in the current project directory. It is a json file containing startup configuration and connection settings; it takes precedence if exists. The following is available:
+
+"request" - either "launch" or "attach". The former is for executing a script. The second is for connecting to a running node instance.
+"program" - in the case of "launch", this is the script's filename and must be present.
+"address" - in the case of "attach", this is the address to connect to. Can be omitted, in this case it defaults to "127.0.0.1".
+"port" - in the case of "attach", this is the port to connect to. Must be present.
+"localRoot" - defines the local directory when connecting to a running container. See VimNodeInspectContainers. 
+"remoteRoot" -  defines the remote directory when connecting to a running container. See VimNodeInspectContainers. 
+
+Here's an example for running a local script:
+
+{
+	"request": "launch",
+	"program": "/Users/eli/Tests/test.js"
+}
+
+And here's one for attaching to a running script:
+
+{
+	"request": "attach",
+	"port": 9229
+}
+
+
+
+====================================================================
+Setting breakpoints				*VimNodeInspectBreakpoints*
+
+Use the following command to set/remove breakpoints. Note breakpoints are triggered through Vim and resolved in node, so resolved locations might differ from the triggered ones. The breakpoints signs appear in the resolved locations.
+
+NodeInspectToggleBreakpoint - Toggle breakpoint
+NodeInspectRemoveAllBreakpoints - Removes all breakpoints
+
+The plugin saves your breakpoint's locations between Vim sessions. Once the plugin is started it will try and re-activate the breakpoints for the current location, that's for all the breakpoints which root in the current working directory.
+
+
+
+====================================================================
+Watches										*VimNodeInspectWatches*
+
+There are two ways to add a watch. One is to use the NodeInspectAddWatch command which will add the word under the cursor as a watch. The other is by directly editing the watch window: this will resolve the watches, one per line. 
+There is no command for removing a watch; remove it by deleting it from the watch window.
+
+NodeInspectAddWatch - Add the word under the cursor to the watch window
+
+
+
+====================================================================
+Debugging commands			*VimNodeInspectCommands*
+
+NodeInspectStepOver - Step over
+NodeInspectStepInto - Step into
+NodeInspectStepOut - Step out
+
+
+
+====================================================================
+Limitation							*VimNodeInspectLimitation*
+
+Not tested on Windows and probably won't work. It a relatively small change to make it there, maybe I'll add it if I have access to a windows machine.
+
+
+
+====================================================================
+License									*VimNodeInspectLicense*
+
+MIT. Similar to the one used in node-inspect. See https://github.com/nodejs/node-inspect/blob/master/LICENSE.
+
+
