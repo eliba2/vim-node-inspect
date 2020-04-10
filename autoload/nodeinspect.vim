@@ -2,7 +2,6 @@ let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
 let s:repl_win = -1
-let s:backtrace_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -373,28 +372,6 @@ function! s:NodeInspectToggleBreakpoint()
 endfunction
 
 
-
-" empty the backtrace window, adds a 'debugger not stopped' window by default
-" or a user message
-function! s:clearBacktraceWindow(...)
-	if a:0 == 0
-		let message = 'Running'
-	else
-		let message = a:1
-	endif
-	let cur_win = win_getid()
-	let gotoResult = win_gotoid(s:backtrace_win)
-	if gotoResult == 1
-		" execute "set modifiable"
-		execute "%d"
-		call setline('.', message)
-		" execute "set nomodifiable"
-		call win_gotoid(cur_win)
-		" execute "set modifiable"
-	endif
-endfunction
-
-
 " called when the debuggger was stopped. settings signs and position
 function! s:onDebuggerStopped(mes)
 	" open the relevant file only if it can be found locally
@@ -403,17 +380,7 @@ function! s:onDebuggerStopped(mes)
 	let readable = filereadable(localFile)
 	if readable && s:session["start"] == 0
 		" print backtrace
-		let gotoResult = win_gotoid(s:backtrace_win)
-		if gotoResult == 1
-			" execute "set modifiable"
-			execute "%d"
-			for traceEntry in a:mes["backtrace"]
-				" props are name & frameLocation
-				call append(getline('$'), traceEntry["name"].'['.traceEntry["frameLocation"].']')
-			endfor
-			execute 'normal! 1G'
-			" execute "set nomodifiable"
-		endif
+		call nodeinspect#backtrace#DisplayBacktraceWindow(a:mes["backtrace"])
 		" goto editor window
 		call win_gotoid(s:start_win)
 		" execute "set modifiable"
@@ -422,7 +389,7 @@ function! s:onDebuggerStopped(mes)
 		call s:addSign(localFile, a:mes["line"])
 	else
 		if !readable
-			call s:clearBacktraceWindow('Debugger Stopped. Source file is not available')
+			call nodeinspect#backtrace#ClearBacktraceWindow('Debugger Stopped. Source file is not available')
 		endif
 	endif
 	" request watches update	
@@ -434,7 +401,7 @@ endfunction
 function! s:onDebuggerHalted()
 	"call s:removeSign()
 	let s:status = 2
-	call s:clearBacktraceWindow('Session ended')
+	call nodeinspect#backtrace#ClearBacktraceWindow('Session ended')
 endfunction
 
 
@@ -500,9 +467,7 @@ function! OnNodeInspectExit(...)
 	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
 		execute "bd!"
 	endif
-	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
-		execute "bd!"
-	endif
+	call nodeinspect#backtrace#KillBacktraceWindow()
 	let inspectWinId = nodeinspect#watches#GetWinId()
 	if inspectWinId != -1 && win_gotoid(inspectWinId) == 1
 		execute "bd!"
@@ -533,35 +498,35 @@ endfunction
 " step over
 function! s:NodeInspectStepOver()
 	call s:removeSign()
-	call s:clearBacktraceWindow()
+	call nodeinspect#backtrace#ClearBacktraceWindow()
 	call nodeinspect#utils#SendEvent('{"m": "nd_next"}')
 endfunction
 
 " step into
 function! s:NodeInspectStepInto()
 	call s:removeSign()
-	call s:clearBacktraceWindow()
+	call nodeinspect#backtrace#ClearBacktraceWindow()
 	call nodeinspect#utils#SendEvent('{"m": "nd_into"}')
 endfunction
 
 " stop, kills node
 function! s:NodeInspectStop()
 	call s:removeSign()
-	call s:clearBacktraceWindow()
+	call nodeinspect#backtrace#ClearBacktraceWindow()
 	call nodeinspect#utils#SendEvent('{"m": "nd_kill"}')
 endfunction
 
 " run (continue)
 function! s:NodeInspectRun()
 	call s:removeSign()
-	call s:clearBacktraceWindow()
+	call nodeinspect#backtrace#ClearBacktraceWindow()
 	call nodeinspect#utils#SendEvent('{"m": "nd_continue"}')
 endfunction
 
 " step out
 function! s:NodeInspectStepOut()
 	call s:removeSign()
-	call s:clearBacktraceWindow()
+	call nodeinspect#backtrace#ClearBacktraceWindow()
 	call nodeinspect#utils#SendEvent('{"m": "nd_out"}')
 endfunction
 
@@ -605,10 +570,8 @@ function! s:NodeInspectStart()
 		let s:repl_win = win_getid()
 		set nonu
 		" open split for call stack
-		execute "rightb ".winwidth(s:start_win)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Callstack"
-		let s:backtrace_win = win_getid()
-		set nonu
-		call s:clearBacktraceWindow()
+		call nodeinspect#backtrace#CreateBacktraceWindow(s:start_win) 
+		call nodeinspect#backtrace#ClearBacktraceWindow()
 		" create inspect window
 		call nodeinspect#watches#CreateWatchWindow(s:start_win) 
 		" back to repl win
@@ -652,7 +615,7 @@ function! s:NodeInspectStart()
 		call s:NodeInspectRemoveAllBreakpoints(0)
 		sleep 150m
 		call s:removeSign()
-		call s:clearBacktraceWindow()
+		call nodeinspect#backtrace#ClearBacktraceWindow()
 		call nodeinspect#utils#SendEvent('{"m": "nd_restart"}')
 		sleep 200m
 	endif
