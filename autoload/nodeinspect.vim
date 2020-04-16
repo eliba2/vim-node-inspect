@@ -378,7 +378,17 @@ function! s:onDebuggerStopped(mes)
 	" translate to local in case of remote connection
 	let localFile = s:getLocalFilePath(a:mes["file"])
 	let readable = filereadable(localFile)
-	if readable && s:session["start"] == 0
+	" if that's the initial stop, resume.
+	if s:session["start"] == 1 
+		let s:session["start"] = 0
+		if s:session["request"] == "launch" && (has_key(s:breakpoints, localFile) == 0 || has_key(s:breakpoints[localFile], a:mes["line"]) == 0)
+			sleep 150m
+			call s:NodeInspectRun()
+			" we've resumed running, do not process any further
+			return
+		endif
+	endif
+	if readable 
 		" print backtrace
 		call nodeinspect#backtrace#DisplayBacktraceWindow(a:mes["backtrace"])
 		" goto editor window
@@ -590,12 +600,12 @@ function! s:NodeInspectStart()
 				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["address"].":".s:session["port"] . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
 			endif
 		endif
+		sleep 200m
 
 		" switch back to start buf
 		call win_gotoid(s:start_win)
 
 		" wait for bridge conenction
-		sleep 200m
 		let connected = nodeinspect#utils#ConnectToBridge()
 		if connected == 0
 			" can't connect. exit.
@@ -607,6 +617,7 @@ function! s:NodeInspectStart()
 		if s:session["request"] == "attach"
 			sleep 100m
 			call nodeinspect#utils#SendEvent('{"m": "nd_print", "txt":"Connected to '.s:session["port"].'\n"}')
+			sleep 100m
 		endif
 	else
 		" set the status to running, might be ended(2)
@@ -621,20 +632,13 @@ function! s:NodeInspectStart()
 	endif
 
 	" send breakpoints, if any
-	sleep 150m
 	call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+	sleep 150m
 	" redraw the watch window; draws any watches added from the session
 	for watch in keys(s:session["watches"])
 		call nodeinspect#watches#AddBulk(s:session["watches"])
 	endfor
 
-	if s:session["start"] == 1 && s:session["request"] == "launch"
-		" not sleeping will send the events together
-		sleep 150m
-		call s:NodeInspectRun()
-	endif
-	" reset start
-	let s:session["start"] = 0
 
 endfunction
 
