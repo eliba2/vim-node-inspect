@@ -14,13 +14,16 @@ let s:configuration = {}
 let s:configFileName = 'vim-node-config.json' 
 let s:msgDelimiter = '&&'
 
+highlight NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
+highlight NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan
+
 autocmd VimLeavePre * call OnVimLeavePre()
 autocmd BufWritePost * call OnBufWritePost()
 
 " utility functions to add signs
 function! s:addBrkptSign(file, line)
 	let s:brkpt_sign_id = s:brkpt_sign_id + 1
-	execute("sign place " . s:brkpt_sign_id . " line=" . a:line . " name=" . s:sign_brkpt . " group=" . s:sign_group . " file=" . a:file)
+	execute("sign place " . s:brkpt_sign_id . " line=" . a:line . " name=" . s:sign_brkpt . " group=" . s:sign_group . "priority=10 file=" . a:file)
 	return s:brkpt_sign_id
 endfunction
 
@@ -29,7 +32,7 @@ function! s:removeBrkptSign(id, file)
 endfunction
 
 function! s:addSign(file, line)
-	execute("sign place " . s:sign_id . " line=" . a:line . " name=" . s:sign_cur_exec . " group=" . s:sign_group .  " file=" . a:file)
+	execute("sign place " . s:sign_id . " line=" . a:line . " name=" . s:sign_cur_exec . " group=" . s:sign_group . " priority=90 file=" . a:file)
 endfunction
 
 function! s:removeSign()
@@ -38,9 +41,9 @@ endfunction
 
 function! s:SignInit()
 	" debug sign 
-	execute "sign define " . s:sign_cur_exec . " text=>> texthl=Select"
+	execute "sign define " . s:sign_cur_exec . " text=>> texthl=NodeInspectSign linehl=NodeInspectSign"
 	" breakpoint sign
-	execute "sign define " . s:sign_brkpt . " text=() texthl=SyntasticErrorSign"
+	execute "sign define " . s:sign_brkpt . " text=() texthl=NodeInspectBreakpoint"
 endfunction
 
 
