@@ -23,7 +23,7 @@ autocmd BufWritePost * call OnBufWritePost()
 " utility functions to add signs
 function! s:addBrkptSign(file, line)
 	let s:brkpt_sign_id = s:brkpt_sign_id + 1
-	execute("sign place " . s:brkpt_sign_id . " line=" . a:line . " name=" . s:sign_brkpt . " group=" . s:sign_group . "priority=10 file=" . a:file)
+	execute("sign place " . s:brkpt_sign_id . " line=" . a:line . " name=" . s:sign_brkpt . " group=" . s:sign_group . " file=" . a:file)
 	return s:brkpt_sign_id
 endfunction
 
@@ -32,7 +32,7 @@ function! s:removeBrkptSign(id, file)
 endfunction
 
 function! s:addSign(file, line)
-	execute("sign place " . s:sign_id . " line=" . a:line . " name=" . s:sign_cur_exec . " group=" . s:sign_group . " priority=90 file=" . a:file)
+	execute("sign place " . s:sign_id . " line=" . a:line . " name=" . s:sign_cur_exec . " group=" . s:sign_group . " file=" . a:file)
 endfunction
 
 function! s:removeSign()
