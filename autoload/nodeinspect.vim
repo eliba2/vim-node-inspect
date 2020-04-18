@@ -101,6 +101,12 @@ function! s:removeSessionKeys(...)
 	endfor
 endfunction
 
+" configuration defualts, for parameters which might or might not appear in
+" the configuration.
+function! s:setConfigurationDefaults()
+	let s:session["restart"] = 0
+endfunction
+
 
 " try and load the config file; it migth not exist, in this case use the
 " defaults. returns 0 on success, !0 on failure.
@@ -140,7 +146,6 @@ function! s:LoadConfigFile()
 				endif
 			endif
 			if has_key(configObj,"program") == 1
-				echom "type ".type(configObj["program"])
 				if type(configObj["program"]) == 1
 					let s:configuration["program"] = configObj["program"]
 				else
@@ -164,6 +169,13 @@ function! s:LoadConfigFile()
 					return 1
 				endif
 			endif
+			if has_key(configObj,"restart") == 1
+				if configObj["restart"] == v:true || configObj["restart"] == 1
+					let s:session["restart"] = 1
+				else
+					let s:session["restart"] = 0
+				endif
+			endif
 
 			" validate config and setup session
 			if has_key(s:configuration, "request") == 1 
@@ -183,6 +195,10 @@ function! s:LoadConfigFile()
 					endif
 				endif
 				if s:configuration["request"] == 'launch' 
+					if has_key(s:configuration, "restart") == 1
+						echom "vim-node-inspect config error, restart in invalid in launch mode"
+						return 1
+					endif
 					if has_key(s:configuration, "program") == 0
 						echom "vim-node-inspect config error, launch without a program"
 						return 1
@@ -451,6 +467,8 @@ function! OnNodeMessage(channel, msgs)
 				call s:NodeInspectStart()
 			elseif mes["m"] == "nd_watchesresolved"
 				call nodeinspect#watches#OnWatchesResolved(mes['watches'])
+			elseif mes["m"] == "nd_node_socket_closed"
+				call s:onNodeInspectSocketClosed()
 			else
 				echo "vim-node-inspect: unknown message "
 			endif
@@ -498,6 +516,18 @@ function! OnBufWritePost()
 	endif
 endfunction
 
+
+" called when a session was terminated in node-inspect. Attempt to reconnect
+" if 'restart' options was set
+function! s:onNodeInspectSocketClosed()
+	if s:session["request"] == "attach" && s:session["restart"] == 1
+		sleep 200m
+		call s:NodeInspectStart()
+	else
+		let s:status = 2
+		call nodeinspect#backtrace#ClearBacktraceWindow('Session ended')
+	endif
+endfunction
 
 " called upon startup, setting signs if any.
 function! nodeinspect#OnNodeInspectEnter()
@@ -554,6 +584,8 @@ endfunction
 " by bridge, simulated in vim)
 " tsap - conenction paramters, if any
 function! s:NodeInspectStart()
+	" set configuration defaults
+	call s:setConfigurationDefaults()
 	" load configuration. if execution is specified there it shall be used.
 	if s:LoadConfigFile() != 0
 		return

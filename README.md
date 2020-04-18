@@ -45,6 +45,7 @@ A sample configuration for launch would be:
 
 **"port"** - in the case of "attach", this is the port to connect to. Must be present.
 
+
 A sample configuration for attach would be:
 
 ```
@@ -53,6 +54,21 @@ A sample configuration for attach would be:
 	"port": 9229
 }
 ```
+
+
+### Automatically restarting the debug session ###
+
+When using an application to monitor changes and restart the node session (such as nodemon or pm2) it is useful to restart the debug session as well. This can be done with the restart parameter, relevant only to an attach request:
+
+```
+{
+	"request": "attach",
+	"port": 9229,
+	"restart": true
+}
+```
+
+
 
 ## Available Commands
 

@@ -340,6 +340,10 @@ class Client extends EventEmitter {
       this._socket = socket;
       socket.on('data', this.handleChunk);
       socket.on('close', () => {
+				// socket closed, notify bridge
+				console.log("Debugger connection lost");
+				let vimMessage = { m: 'nd_node_socket_closed' };
+				this.nvim_bridge.send(vimMessage);
         this.emit('close');
       });
 
