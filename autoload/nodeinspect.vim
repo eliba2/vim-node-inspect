@@ -93,138 +93,6 @@ function! s:loadSessionFile()
 endfunction
 
 
-function! s:removeSessionKeys(...)
-	for uvar in a:000
-		if has_key(s:session, uvar)
-			call remove(s:session, uvar)
-		endif
-	endfor
-endfunction
-
-" configuration defualts, for parameters which might or might not appear in
-" the configuration.
-function! s:setConfigurationDefaults()
-	let s:session["restart"] = 0
-endfunction
-
-
-" try and load the config file; it migth not exist, in this case use the
-" defaults. returns 0 on success, !0 on failure.
-function! s:LoadConfigFile()
-	let s:configuration = {}
-	let configFilePath = getcwd() . '/' . s:configFileName
-	let fullFile = ''
-	" clear previous sessoin config
-	call s:removeSessionKeys("localRoot","remoteRoot")
-
-	if filereadable(configFilePath)
-		let lines = readfile(configFilePath)
-		for line in lines
-			let fullFile = fullFile . line
-		endfor
-		" loaded the entire file, parse it to object
-		let configObj = json_decode(fullFile)
-		if type(configObj) == 4 
-			if has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
-				let s:configuration["localRoot"] = configObj["localRoot"]
-				let s:configuration["remoteRoot"] = configObj["remoteRoot"]
-				" add trailing backslash if not present. it will normalize both inputs
-				" in case the user add one with and one without
-				if s:configuration["localRoot"][-1:-1] != '/' 
-					let s:configuration["localRoot"] = s:configuration["localRoot"] . '/'
-				endif
-				if s:configuration["remoteRoot"][-1:-1] != '/' 
-					let s:configuration["remoteRoot"] = s:configuration["remoteRoot"] . '/'
-				endif
-			endif
-			if has_key(configObj,"request") == 1
-				if configObj["request"] == 'attach' || configObj["request"] == 'launch'
-					let s:configuration["request"] = configObj["request"]
-				else
-					echom "error reading launch in vim-node-inspect"
-					return 1
-				endif
-			endif
-			if has_key(configObj,"program") == 1
-				if type(configObj["program"]) == 1
-					let s:configuration["program"] = configObj["program"]
-				else
-					echom "error reading program in vim-node-inspect"
-					return 1
-				endif
-			endif
-			if has_key(configObj,"address") == 1
-				if type(configObj["address"]) == 1
-					let s:configuration["address"] = configObj["address"]
-				else
-					echom "error reading address in vim-node-inspect"
-					return 1
-				endif
-			endif
-			if has_key(configObj,"port") == 1
-				if type(configObj["port"]) == 0
-					let s:configuration["port"] = configObj["port"]
-				else
-					echom "error reading port in vim-node-inspect"
-					return 1
-				endif
-			endif
-			if has_key(configObj,"restart") == 1
-				if configObj["restart"] == v:true || configObj["restart"] == 1
-					let s:session["restart"] = 1
-				else
-					let s:session["restart"] = 0
-				endif
-			endif
-
-			" validate config and setup session
-			if has_key(s:configuration, "request") == 1 
-				if s:configuration["request"] == 'attach' 
-					if has_key(s:configuration, "port") == 0
-						echom "vim-node-inspect config error, attach without a port"
-						return 1
-					else
-						let s:session["request"] = s:configuration["request"]
-						let s:session["port"] = s:configuration["port"]
-						" address defaults to localhost
-						if has_key(s:configuration, "address")
-							let s:session["address"] = s:configuration["address"]
-						else
-							let s:session["address"] = "127.0.0.1"
-						endif
-					endif
-				endif
-				if s:configuration["request"] == 'launch' 
-					if has_key(s:configuration, "restart") == 1
-						echom "vim-node-inspect config error, restart in invalid in launch mode"
-						return 1
-					endif
-					if has_key(s:configuration, "program") == 0
-						echom "vim-node-inspect config error, launch without a program"
-						return 1
-					else
-						let s:session["request"] = s:configuration["request"]
-						let s:session["program"] = s:configuration["program"]
-					endif
-				endif
-			endif
-			if (has_key(s:configuration, "localRoot") == 1 || has_key(s:configuration, "remoteRoot") == 1)
-				if ((has_key(s:configuration, "localRoot") == 1 && has_key(s:configuration, "remoteRoot") == 0) || (has_key(s:configuration, "localRoot") == 0 && has_key(s:configuration, "remoteRoot") == 1))
-					echom 'vim-node-inspect directories set error'
-					return 1
-				else
-					let s:session["localRoot"] = s:configuration["localRoot"]
-					let s:session["remoteRoot"] = s:configuration["remoteRoot"]
-				endif
-			endif
-		else
-			echom 'error reading vim-node-config.json, not a valid json'
-			return 1
-		endif
-	endif
-endfunction
-
-
 " called on removal of the node bridge.
 function! s:NodeInspectCleanup()
 	let s:status = 0
@@ -584,10 +452,12 @@ endfunction
 " by bridge, simulated in vim)
 " tsap - conenction paramters, if any
 function! s:NodeInspectStart()
-	" set configuration defaults
-	call s:setConfigurationDefaults()
-	" load configuration. if execution is specified there it shall be used.
-	if s:LoadConfigFile() != 0
+	" set configuration defaults 	
+	call  nodeinspect#config#SetConfigurationDefaults(s:session)
+	" load configuration. if execution is specified there it shall be used.  
+	" clear configuration in here as it can't be done when passing a variable
+	let s:configuration = {}
+	if nodeinspect#config#LoadConfigFile(s:configuration, s:session) != 0
 		return
 	endif
 	" if app, must start with a file
