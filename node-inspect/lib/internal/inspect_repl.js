@@ -90,8 +90,7 @@ function isNativeUrl(url) {
   return url.replace('.js', '') in NATIVES || url === 'bootstrap_node.js';
 }
 
-function getRelativePath(filenameOrURL) {
-  const dir = Path.join(Path.resolve(), 'x').slice(0, -1);
+function getAbsolutePath(filenameOrURL) {
 	var filename;
 
 	if (filenameOrURL.startsWith('file://')) {
@@ -107,12 +106,21 @@ function getRelativePath(filenameOrURL) {
 	else
 		filename = filenameOrURL;
 
-  // Change path to relative, if possible
-  if (filename.indexOf(dir) === 0) {
-    return filename.slice(dir.length);
-  }
   return filename;
 }
+
+
+function getRelativePath(filenameOrURL) {
+  const dir = Path.join(Path.resolve(), 'x').slice(0, -1);
+	var filename = getAbsolutePath(filenameOrURL);
+
+  // Change path to relative, if possible
+	if (filename.indexOf(dir) === 0) {
+		return filename.slice(dir.length);
+	}
+  return filename;
+}
+
 
 function toCallback(promise, callback) {
   function forward(...args) {
@@ -665,6 +673,17 @@ function createRepl(inspector, nvim_bridge_p) {
 		if (location.scriptUrl.indexOf("file://") == 0) {
 			resolveFile = location.scriptUrl.slice(7);
 		}
+		// container might use pattern of .*<file>$
+		if (location.scriptUrl.startsWith(".*//")) {
+			resolveFile = resolveFile.slice(3);
+		}
+		else // that's for double check
+			if (location.scriptUrl.startsWith(".*")) {
+				resolveFile = resolveFile.slice(2);
+			}
+		if (location.scriptUrl.endsWith("$")) {
+			resolveFile = resolveFile.slice(0,-1);
+		}
 		let m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber + 1 };
 		nvim_bridge.send(m);
   }
@@ -917,12 +936,16 @@ function createRepl(inspector, nvim_bridge_p) {
 
     const breakType = reason === 'other' ? 'break' : reason;
     const script = knownScripts[scriptId];
-    const scriptUrl = script ? getRelativePath(script.url) : '[unknown]';
+		const scriptUrl = script ? getAbsolutePath(script.url) : '[unknown]';
 
     const header = `${breakType} in ${scriptUrl}:${lineNumber + 1}`;
 		/* notify nvim */
 		//getArguments(); // call get arguments and set the parameters to the stop function to display in the watch window
-		let m = { m: 'nd_stopped', file: scriptUrl, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};
+		let scriptPrefix = ''; 
+		if (scriptUrl && scriptUrl.length && scriptUrl[0] != '/' && scriptUrl[0] != '[') {
+			scriptPrefix = '/';
+		}
+		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};
 		nvim_bridge.send(m);
 
     inspector.suspendReplWhile(() =>

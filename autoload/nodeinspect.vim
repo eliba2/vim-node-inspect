@@ -265,16 +265,32 @@ function! s:onDebuggerStopped(mes)
 	" translate to local in case of remote connection
 	let localFile = s:getLocalFilePath(a:mes["file"])
 	let readable = filereadable(localFile)
-	" if that's the initial stop, resume.
-	if s:session["start"] == 1 
-		let s:session["start"] = 0
-		if s:session["request"] == "launch" && (has_key(s:breakpoints, localFile) == 0 || has_key(s:breakpoints[localFile], a:mes["line"]) == 0)
-			sleep 150m
-			call s:NodeInspectRun()
-			" we've resumed running, do not process any further
-			return
+	" if this the initial stop for launch, process breakpoints in here and
+	" continue running if start-run is to be emulated
+	if s:session["request"] == "launch"
+		if s:session["initialLaunchBreak"] == 1
+			let s:session["initialLaunchBreak"] = 0
+			" if there are any breakpoints to set, set them now. If started running, execution will
+			" continue when resolved
+			if len(s:breakpoints) > 0
+				let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
+				" that saves me from deepcopy
+				let remoteBreakpointsJson = json_encode(remoteBreakpoints)
+				" remove all breakpoint, they will be resolved and set by node-inspect
+				call s:NodeInspectRemoveAllBreakpoints(0)
+				" send breakpoints, if any
+				call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+			else
+				" no breakpoints to resolve
+				if s:session["startRun"] == 1 
+					let s:session["startRun"] = 0 
+					sleep 150m
+					call s:NodeInspectRun()
+				endif
+			endif
 		endif
 	endif
+	
 	if readable 
 		" print backtrace
 		call nodeinspect#backtrace#DisplayBacktraceWindow(a:mes["backtrace"])
@@ -326,12 +342,22 @@ function! OnNodeMessage(channel, msgs)
 			elseif mes["m"] == "nd_brk_resolved"
 				"echom "breakpoint resolved ".mes["file"]." ".mes["line"]
 				call s:breakpointResolved(mes["file"],mes["line"])
+				if s:session["request"] == "launch" && s:session["startRun"] == 1 
+					let s:session["startRun"] = 0
+					sleep 150m
+					call s:NodeInspectRun()
+				endif
 			elseif mes["m"] == "nd_brk_failed"
 				echom "cant set breakpoint"
+				if s:session["request"] == "launch" && s:session["startRun"] == 1 
+					let s:session["startRun"] = 0
+					sleep 150m
+					call s:NodeInspectRun()
+				endif
 			elseif mes["m"] == "nd_sockerror"
 				echom "vim-node-inspect: failed to connect to remote host"
 			elseif mes["m"] == "nd_restartequired"
-				let s:session["start"] = s:session["lastStart"]
+				let s:session["startRun"] = s:session["lastStart"]
 				call s:NodeInspectStart()
 			elseif mes["m"] == "nd_watchesresolved"
 				call nodeinspect#watches#OnWatchesResolved(mes['watches'])
@@ -339,6 +365,23 @@ function! OnNodeMessage(channel, msgs)
 				call s:onNodeInspectSocketClosed()
 			else
 				echo "vim-node-inspect: unknown message "
+			endif
+			" post handle triggers
+			if mes["m"] == "nd_brk_resolved" || mes["m"] == "nd_brk_failed"
+				" handle start-run. run is emulated when breakpoints are resolved (if
+				" any)
+				if s:session["request"] == "launch" && s:session["startRun"] == 1 
+					let s:session["startRun"] = 0
+					" only continue running of not requested to stop on the initial
+					" line.
+					let localFile = s:getLocalFilePath(mes["file"])
+					if has_key(s:breakpoints, localFile) == 0 || has_key(s:breakpoints[localFile], mes["line"]) == 0
+						sleep 150m
+						call s:NodeInspectRun()
+						" we've resumed running, do not process any further
+						return
+					endif
+				endif
 			endif
 		endfor
 	endif
@@ -465,17 +508,10 @@ function! s:NodeInspectStart()
 		echom "node-inspect must start with a file. Save the buffer first"
 		return
 	endif
-	" remove breakpoints if any, they will be re-invalidated after the debugger
-	" will (re)start.
-	let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
-	" that saves me from deepcopy
-	let remoteBreakpointsJson = json_encode(remoteBreakpoints)
 	" register global on exit, add signs 
 	if s:status == 0
 		" start
 		let s:status = 1
-		" remove all breakpoint, they will be resolved by node-inspect
-		call s:NodeInspectRemoveAllBreakpoints(0)
 		let s:start_win = win_getid()
 		"if s:connectionType == 'program'
 			"let file = expand('%:p')
@@ -528,17 +564,28 @@ function! s:NodeInspectStart()
 		" set the status to running, might be ended(2)
 		let s:status = 1
 		" remove all breakpoint, they will be resolved by node-inspect
-		call s:NodeInspectRemoveAllBreakpoints(0)
-		sleep 150m
+		"call s:NodeInspectRemoveAllBreakpoints(0)
+		"sleep 150m
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()
 		call nodeinspect#utils#SendEvent('{"m": "nd_restart"}')
 		sleep 200m
 	endif
 
-	" send breakpoints, if any
-	call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
-	sleep 150m
+	if s:session["request"] == "attach"
+		" remove breakpoints if any, they will be re-invalidated after the debugger
+		" will (re)start.
+		if len(s:breakpoints) > 0
+			let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
+			" that saves me from deepcopy
+			let remoteBreakpointsJson = json_encode(remoteBreakpoints)
+			" remove all breakpoint, they will be resolved and set by node-inspect
+			call s:NodeInspectRemoveAllBreakpoints(0)
+			" send breakpoints, if any
+			call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
+			sleep 150m
+		endif
+	endif
 	" redraw the watch window; draws any watches added from the session
 	for watch in keys(s:session["watches"])
 		call nodeinspect#watches#AddBulk(s:session["watches"])
@@ -602,10 +649,11 @@ function! nodeinspect#NodeInspectRun()
 	endif
 	let s:session["lastStart"] = 1
 	if s:status != 1
-		let s:session["start"] = 1
+		let s:session["startRun"] = 1
 		let s:session["port"] = -1
 		let s:session["request"] = "launch"
 		let s:session["program"] = expand('%:p')
+		let s:session["initialLaunchBreak"] = 1
     call s:NodeInspectStart()
 	else
 		call s:NodeInspectRun()
@@ -627,10 +675,11 @@ function! nodeinspect#NodeInspectStart()
 	endif
 	let s:session["lastStart"] = 0
 	if s:status != 1
-		let s:session["start"] = 0
+		let s:session["startRun"] = 0
 		let s:session["port"] = -1
 		let s:session["request"] = "launch"
 		let s:session["program"] = expand('%:p')
+		let s:session["initialLaunchBreak"] = 1
 		call s:NodeInspectStart()
 	endif
 endfunction
@@ -653,7 +702,8 @@ function! nodeinspect#NodeInspectConnect(fullAdress)
 	let s:session["port"] = addressParts[1]
 	let s:session["request"] = "attach"
 	let s:session["lastStart"] = 0
-	let s:session["start"] = 0
+	let s:session["startRun"] = 0
+	let s:session["initialLaunchBreak"] = 0
 	call s:NodeInspectStart()
 endfunction
 
