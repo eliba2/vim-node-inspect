@@ -2,6 +2,7 @@ Note	vim-node-inspect.txt	/*Note*
 VimNodeInspectBreakpoints	vim-node-inspect.txt	/*VimNodeInspectBreakpoints*
 VimNodeInspectCommands	vim-node-inspect.txt	/*VimNodeInspectCommands*
 VimNodeInspectConfiguration	vim-node-inspect.txt	/*VimNodeInspectConfiguration*
+VimNodeInspectContainers	vim-node-inspect.txt	/*VimNodeInspectContainers*
 VimNodeInspectContents	vim-node-inspect.txt	/*VimNodeInspectContents*
 VimNodeInspectIntroduction	vim-node-inspect.txt	/*VimNodeInspectIntroduction*
 VimNodeInspectLicense	vim-node-inspect.txt	/*VimNodeInspectLicense*

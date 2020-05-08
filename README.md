@@ -20,13 +20,15 @@ Plug 'eliba2/vim-node-inspect'
 ## How to use
 Either start a node script or attach to an already running script. Both can be done manually (NodeIndpectStart/NodeInspectRun) or using the configuration file vim-node-config.json. The later is encouraged.
 
+For full documentation see :h vim-node-inspect.
+
 ### Starting Manually ###
 
-Either start debugging a local js file (via NodeInspectStart or NodeInspectRun) or connect to a running instance using NodeInspectConnect. In the later case the target must start with --inspect (e.g. node --inspect server.js). If a configuration file is present, it takes precedence.
+Either start debugging a local js file (via NodeInspectStart or NodeInspectRun) or connect to a running instance using NodeInspectConnect. In the later case the target must start with --inspect (e.g. node --inspect server.js). 
 
 ### Using the configuration file ###
 
-Use the configuration file to define the starting method. Create a file named "vim-node-config.json" in the current working directory. The format is json, and the available options are:
+Use the configuration file to define the starting method. Create a file named **"vim-node-config.json"** in the current working directory. The format is json, and the available options are:
 
 **"request"** - either "launch" or "attach". The former is for executing a script. The second is for connecting to a running node instance.
 
@@ -36,10 +38,14 @@ A sample configuration for launch would be:
 ```
 {
 	"request": "launch",
-	"program": "/Users/eli/Tests/test.js"
+	"program": "/Users/eli/Tests/test.js",
+	"args": ["first", "second"]
 }
 ```
 
+Use absolute paths. "${workspaceFolder}" can be used, it equals to the current working directory (:pwd).
+
+**"args"** - an array list of script arguments. Relevant only to "launch", optional.
 
 **"address"** - in the case of "attach", this is the address to connect to. Can be omitted, in this case it defaults to "127.0.0.1".
 
@@ -74,9 +80,9 @@ When using an application to monitor changes and restart the node session (such 
 
 The following commands are available:
 
-**NodeInspectStart** - Starts debugger, paused
+**NodeInspectStart [args]** - Starts debugger, paused
 
-**NodeInspectRun** - Continue / Start and run immediatly
+**NodeInspectRun [args]** - Continue / Start and run immediatly
 
 **NodeInspectConnect** host:port - Connect to a running instance
 
@@ -122,9 +128,12 @@ Remove a watch by deleting it from the watch window.
 
 ## Connecting to a running container
 
-You'll need to configure the local and remote directories when connecting to a remote host or the local instance will set the wrong breakpoints locations. This can be set by creating a configuration file "vim-node-config.json" in the relevant project' directory, as follows:
+You'll need to configure the local and remote directories when connecting to a remote host or the local instance will set the wrong breakpoints locations. Use the configuration file to set these directories, such as:
+
 ```
 {
+	"request": "attach",
+	"port": 9229,
   "localRoot": "/Users/eli/projects/my-test-project",
   "remoteRoot": "/app"
 }

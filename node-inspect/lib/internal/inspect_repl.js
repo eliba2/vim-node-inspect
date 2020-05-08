@@ -1256,7 +1256,8 @@ function createRepl(inspector, nvim_bridge_p) {
 				Debugger.resume();
 				break;
 			case 'nd_restart':
-				inspector.run();
+				// make an js array out of args, argv-argc style
+				inspector.rerun(message.script, message.args);
 				break;
 			case 'nd_print':
 				print(message.txt);

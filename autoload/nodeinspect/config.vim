@@ -13,6 +13,7 @@ endfunction
 " the configuration.
 function! nodeinspect#config#SetConfigurationDefaults(session)
 	let a:session["restart"] = 0
+	let a:session["configUsed"] = 0
 endfunction
 
 
@@ -38,6 +39,9 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 	call s:removeSessionKeys(a:session,"localRoot","remoteRoot")
 
 	if filereadable(configFilePath)
+		" indicate this configuration is from file
+		let a:session["configUsed"] = 1
+		"read file
 		let lines = readfile(configFilePath)
 		for line in lines
 			let fullFile = fullFile . line
@@ -96,6 +100,10 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 					let a:session["restart"] = 0
 				endif
 			endif
+			if has_key(configObj,"args") == 1
+				let a:session["args"] = configObj["args"][:]
+			endif
+
 
 			" validate config and setup session
 			if has_key(a:configuration, "request") == 1 
@@ -124,7 +132,7 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 						return 1
 					else
 						let a:session["request"] = a:configuration["request"]
-						let a:session["program"] = a:configuration["program"]
+						let a:session["script"] = a:configuration["program"]
 					endif
 				endif
 			endif

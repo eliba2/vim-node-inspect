@@ -225,8 +225,30 @@ class NodeInspector {
     }
   }
 
+	// in the case of restart the parameters might change, such in the case of a user started the script with arg "x" and subsequent exec started it with "y". in such case the the runScript must be rebinded as bind parameters can't be changed (or the whole session needs to re-start).
+	rerun(script, scriptArgs) {
+		let options = this.options;
+    if (options && options.script) {
+			// check if the script or parameters were changed
+			let argsChanged = ((scriptArgs.length != options.scriptArgs.length) || 
+					((scriptArgs.length > 0  || options.scriptArgs.length > 0) && 
+					(JSON.stringify(scriptArgs) != JSON.stringify(options.scriptArgs))));
+			let scriptChanged = script != options.script;
+			if (scriptChanged || argsChanged) {
+				this._runScript = runScript.bind(null,
+					script,
+					scriptArgs,
+					options.host,
+					options.port,
+					this.childPrint.bind(this));
+			}
+		}
+		this.run();
+	}
+
   run() {
     this.killChild();
+
 
     return this._runScript().then(([child, port, host]) => {
       this.child = child;
@@ -273,13 +295,21 @@ class NodeInspector {
   }
 
   childPrint(text) {
-    this.print(
-      text.toString()
-        .split(/\r\n|\r|\n/g)
-        .filter((chunk) => !!chunk)
-        .map((chunk) => `< ${chunk}`)
-        .join('\n')
-    );
+
+		let skipPrint = false;
+			if (/For help see https:\/\/nodejs.org\/en\/docs\/inspector/.test(text) ||
+			/Waiting for the debugger to disconnect\.\.\./.test(text)) {
+			skipPrint = true;
+		}
+		if (!skipPrint) {
+			this.print(
+				text.toString()
+				.split(/\r\n|\r|\n/g)
+				.filter((chunk) => !!chunk)
+				.map((chunk) => `< ${chunk}`)
+				.join('\n')
+			);
+		}
     if (!this.paused) {
       this.repl.displayPrompt(true);
     }

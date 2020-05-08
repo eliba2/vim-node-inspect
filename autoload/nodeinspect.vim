@@ -286,6 +286,8 @@ function! s:onDebuggerStopped(mes)
 					let s:session["startRun"] = 0 
 					sleep 150m
 					call s:NodeInspectRun()
+					" return as the script continues
+					return
 				endif
 			endif
 		endif
@@ -491,9 +493,6 @@ endfunction
 
 
 " starts node-inspect. connects to the node bridge.
-" start (0/1) - start running, do not break on the first line (not supported
-" by bridge, simulated in vim)
-" tsap - conenction paramters, if any
 function! s:NodeInspectStart()
 	" set configuration defaults 	
 	call  nodeinspect#config#SetConfigurationDefaults(s:session)
@@ -504,8 +503,8 @@ function! s:NodeInspectStart()
 		return
 	endif
 	" if app, must start with a file
-	if bufname('') == '' && s:configuration["request"] == "launch"
-		echom "node-inspect must start with a file. Save the buffer first"
+	if s:session["request"] == "launch" && s:session["script"] == ''
+		echom "node-inspect must start with a file."
 		return
 	endif
 	" register global on exit, add signs 
@@ -513,9 +512,6 @@ function! s:NodeInspectStart()
 		" start
 		let s:status = 1
 		let s:start_win = win_getid()
-		"if s:connectionType == 'program'
-			"let file = expand('%:p')
-		"endif
 		" create bottom buffer, switch to it
 		execute "bo ".winheight(s:start_win)/3."new"
 		let s:repl_win = win_getid()
@@ -527,19 +523,24 @@ function! s:NodeInspectStart()
 		call nodeinspect#watches#CreateWatchWindow(s:start_win) 
 		" back to repl win
 		call win_gotoid(s:repl_win)
+		" prepare call command line
+		let cmd_line = []
+		call add(cmd_line, 'node')
+		call add(cmd_line, s:plugin_path . "/node-inspect/cli.js")
 		" start according to settings
 		if s:session["request"] == "launch"
-			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["program"] . "', {'on_exit': 'OnNodeInspectExit'})"
-			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["program"] . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
-			endif
+			" add the relevant launch params
+			call add(cmd_line, s:session["script"])
+			let cmd_line += s:session["args"]
 		else
-			if has("nvim")
-				execute "let s:term_id = termopen ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["address"].":".s:session["port"] . "', {'on_exit': 'OnNodeInspectExit'})"
-			else
-				execute "let s:term_id = term_start ('node " . s:plugin_path . "/node-inspect/cli.js " . s:session["address"].":".s:session["port"] . "', {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})"
-			endif
+			" add the relevant connect params
+			call add(cmd_line, s:session["address"].":".s:session["port"])
+		endif
+		" open terminal
+		if has("nvim")
+			let s:term_id = termopen(cmd_line, {'on_exit': 'OnNodeInspectExit'})
+		else
+			let s:term_id = term_start(cmd_line, {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})
 		endif
 		sleep 200m
 
@@ -561,14 +562,19 @@ function! s:NodeInspectStart()
 			sleep 100m
 		endif
 	else
-		" set the status to running, might be ended(2)
+		" the current buffer file might change. get the current.
+		if s:session["request"] == "launch" && s:session["configUsed"] == 0
+			let gotoStartwin = win_gotoid(s:start_win)
+			if gotoStartwin == 1
+				let s:session["script"] = expand('%:p')
+			endif
+		endif
+		" set the status to running, might be at ended(2)
 		let s:status = 1
 		" remove all breakpoint, they will be resolved by node-inspect
-		"call s:NodeInspectRemoveAllBreakpoints(0)
-		"sleep 150m
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()
-		call nodeinspect#utils#SendEvent('{"m": "nd_restart"}')
+		call nodeinspect#utils#SendEvent('{"m": "nd_restart", "script": "'. s:session["script"] . '","args": ' . json_encode(s:session["args"]) . '}')
 		sleep 200m
 	endif
 
@@ -599,7 +605,6 @@ endfunction
 function! s:GetStatus()
 	return s:status
 endfunction
-
 
 " Callable functions / plugin API
 function! nodeinspect#NodeInspectToggleBreakpoint()
@@ -642,7 +647,7 @@ function! nodeinspect#NodeInspectPause()
 	call s:NodeInspectPause()
 endfunction
 
-function! nodeinspect#NodeInspectRun()
+function! nodeinspect#NodeInspectRun(...)
 	if &mod == 1
 		echom "Can't start while file is dirty, save the file first"
 		return
@@ -652,8 +657,9 @@ function! nodeinspect#NodeInspectRun()
 		let s:session["startRun"] = 1
 		let s:session["port"] = -1
 		let s:session["request"] = "launch"
-		let s:session["program"] = expand('%:p')
+		let s:session["script"] = expand('%:p')
 		let s:session["initialLaunchBreak"] = 1
+		let s:session["args"] = a:000[:]
     call s:NodeInspectStart()
 	else
 		call s:NodeInspectRun()
@@ -661,14 +667,14 @@ function! nodeinspect#NodeInspectRun()
 endfunction
 
 function! nodeinspect#NodeInspectStop()
-	if s:status != 1
+	if s:status == 0
 		echo "node-inspect not started"
 		return
 	endif
 	call s:NodeInspectStop()
 endfunction
 
-function! nodeinspect#NodeInspectStart()
+function! nodeinspect#NodeInspectStart(...)
 	if &mod == 1
 		echom "Can't start while file is dirty, save the file first"
 		return
@@ -678,8 +684,9 @@ function! nodeinspect#NodeInspectStart()
 		let s:session["startRun"] = 0
 		let s:session["port"] = -1
 		let s:session["request"] = "launch"
-		let s:session["program"] = expand('%:p')
+		let s:session["script"] = expand('%:p')
 		let s:session["initialLaunchBreak"] = 1
+		let s:session["args"] = a:000[:]
 		call s:NodeInspectStart()
 	endif
 endfunction

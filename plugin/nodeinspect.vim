@@ -15,8 +15,8 @@ if has("nvim") == 0 && v:version < 801
 endif
 let nodeinspect_loaded = 1
 
-command! -nargs=0 NodeInspectStart call nodeinspect#NodeInspectStart()
-command! -nargs=0 NodeInspectRun call nodeinspect#NodeInspectRun()
+command! -nargs=* NodeInspectStart call nodeinspect#NodeInspectStart(<args>)
+command! -nargs=0 NodeInspectRun call nodeinspect#NodeInspectRun(<args>)
 command! -nargs=1 NodeInspectConnect call nodeinspect#NodeInspectConnect(<args>)
 "command! -nargs=0 NodeInspectPause call nodeinspect#NodeInspectPause()
 command! -nargs=0 NodeInspectStepOver call nodeinspect#NodeInspectStepOver()
