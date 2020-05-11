@@ -100,9 +100,6 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 					let a:session["restart"] = 0
 				endif
 			endif
-			if has_key(configObj,"args") == 1
-				let a:session["args"] = configObj["args"][:]
-			endif
 
 
 			" validate config and setup session
@@ -144,6 +141,13 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 					let a:session["localRoot"] = a:configuration["localRoot"]
 					let a:session["remoteRoot"] = a:configuration["remoteRoot"]
 				endif
+			endif
+			" read each line of args in order to alter the value
+			let a:session["args"] = []
+			if has_key(configObj,"args") == 1
+				for singleArg in configObj["args"]
+					call add(a:session["args"] ,s:ReplaceMacros(singleArg))
+				endfor
 			endif
 		else
 			echom 'error reading vim-node-config.json, not a valid json'
