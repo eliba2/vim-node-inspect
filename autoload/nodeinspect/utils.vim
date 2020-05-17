@@ -44,3 +44,4 @@ function nodeinspect#utils#CloseChannel()
 		call ch_close(s:channel)
 	endif	
 endfunction
+

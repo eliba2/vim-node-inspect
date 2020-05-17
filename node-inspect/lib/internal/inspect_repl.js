@@ -1285,7 +1285,7 @@ function createRepl(inspector, nvim_bridge_p) {
 				break;
 			case 'nd_verifyrestart':
 				if (vimGetScripts()[message.file]) {
-					let m = { m: 'nd_restartequired' };
+					let m = { m: 'nd_restartrequired' };
 					nvim_bridge.send(m);
 				}
 				break;

@@ -1,7 +1,6 @@
-let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited)
+let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
-let s:repl_win = -1
 let s:brkpt_sign_id = 3
 let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
@@ -358,15 +357,19 @@ function! OnNodeMessage(channel, msgs)
 				endif
 			elseif mes["m"] == "nd_sockerror"
 				echom "vim-node-inspect: failed to connect to remote host"
-			elseif mes["m"] == "nd_restartequired"
+			elseif mes["m"] == "nd_restartrequired"
 				let s:session["startRun"] = s:session["lastStart"]
 				call s:NodeInspectStart()
 			elseif mes["m"] == "nd_watchesresolved"
 				call nodeinspect#watches#OnWatchesResolved(mes['watches'])
 			elseif mes["m"] == "nd_node_socket_closed"
 				call s:onNodeInspectSocketClosed()
+			elseif mes["m"] == "nd_node_socket_ready"
+				if s:status == 3
+					let s:status = 1
+				endif
 			else
-				echo "vim-node-inspect: unknown message "
+				echo "vim-node-inspect: unknown message ".mes["m"]
 			endif
 			" post handle triggers
 			if mes["m"] == "nd_brk_resolved" || mes["m"] == "nd_brk_failed"
@@ -408,14 +411,9 @@ endfunction
 function! OnNodeInspectExit(...)
 	" make sure windows are closed (in case of stopped buffer)
 	" in nvim there's no such option at all (close the window when closed)
-	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
-		execute "bd!"
-	endif
+	call nodeinspect#utils#KillReplWindow()
 	call nodeinspect#backtrace#KillBacktraceWindow()
-	let inspectWinId = nodeinspect#watches#GetWinId()
-	if inspectWinId != -1 && win_gotoid(inspectWinId) == 1
-		execute "bd!"
-	endif
+	call nodeinspect#watches#KillWatchWindow()
 	call s:NodeInspectCleanup()
 endfunction
 
@@ -433,22 +431,25 @@ endfunction
 " called when a session was terminated in node-inspect. Attempt to reconnect
 " if 'restart' options was set
 function! s:onNodeInspectSocketClosed()
-	if s:session["request"] == "attach" && s:session["restart"] == 1
-		sleep 200m
-		call s:NodeInspectStart()
-	else
-		let s:status = 2
-		call nodeinspect#backtrace#ClearBacktraceWindow('Session ended')
+	" in case of "restarting' status (3), ignore this as node-inspect restarts
+	" and will cause a socket loss
+	if s:status != 3
+		if s:session["request"] == "attach" && s:session["restart"] == 1
+			sleep 200m
+			call s:NodeInspectStart()
+		else
+			let s:status = 2
+			call nodeinspect#backtrace#ClearBacktraceWindow('Session ended')
+		endif
 	endif
 endfunction
+
 
 " called upon startup, setting signs if any.
 function! nodeinspect#OnNodeInspectEnter()
 	call s:SignInit()
 	call s:loadSessionFile()
 endfunction
-
-
 
 
 " step over
@@ -512,41 +513,16 @@ function! s:NodeInspectStart()
 		" start
 		let s:status = 1
 		let s:start_win = win_getid()
-		" create bottom buffer, switch to it
-		execute "bo ".winheight(s:start_win)/3."new"
-		let s:repl_win = win_getid()
-		set nonu
-		" open split for call stack
-		call nodeinspect#backtrace#CreateBacktraceWindow(s:start_win) 
+		" show all windows
+		call nodeinspect#repl#ShowReplWindow(s:start_win) 
+		call nodeinspect#backtrace#ShowBacktraceWindow(s:start_win) 
+		call nodeinspect#watches#ShowWatchWindow(s:start_win) 
+		" clear backtrace
 		call nodeinspect#backtrace#ClearBacktraceWindow()
-		" create inspect window
-		call nodeinspect#watches#CreateWatchWindow(s:start_win) 
 		" back to repl win
-		call win_gotoid(s:repl_win)
-		" prepare call command line
-		let cmd_line = []
-		call add(cmd_line, 'node')
-		call add(cmd_line, s:plugin_path . "/node-inspect/cli.js")
-		" start according to settings
-		if s:session["request"] == "launch"
-			" add the relevant launch params
-			call add(cmd_line, s:session["script"])
-			let cmd_line += s:session["args"]
-		else
-			" add the relevant connect params
-			call add(cmd_line, s:session["address"].":".s:session["port"])
-		endif
-		" open terminal
-		if has("nvim")
-			let s:term_id = termopen(cmd_line, {'on_exit': 'OnNodeInspectExit'})
-		else
-			let s:term_id = term_start(cmd_line, {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})
-		endif
-		sleep 200m
-
+		call nodeinspect#repl#StartNodeInspect(s:session, s:plugin_path)
 		" switch back to start buf
 		call win_gotoid(s:start_win)
-
 		" wait for bridge conenction
 		let connected = nodeinspect#utils#ConnectToBridge()
 		if connected == 0
@@ -570,7 +546,7 @@ function! s:NodeInspectStart()
 			endif
 		endif
 		" set the status to running, might be at ended(2)
-		let s:status = 1
+		let s:status = 3
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()
@@ -597,8 +573,18 @@ function! s:NodeInspectStart()
 		call nodeinspect#watches#AddBulk(s:session["watches"])
 	endfor
 
-
 endfunction
+
+
+" toggle the debugger window
+function! s:NodeInspectToggleWindow()
+	let s:start_win = win_getid()
+	call nodeinspect#repl#ToggleReplWindow(s:start_win) 
+	call nodeinspect#backtrace#ToggleBacktraceWindow(s:start_win) 
+	call nodeinspect#watches#ToggleWatchWindow(s:start_win) 
+	call win_gotoid(s:start_win)
+endfunction
+
 
 " get the current status (0 - not initialized, 1 - running, 2 - ended (bridge
 " exists but no node). Used by modules.
@@ -720,5 +706,10 @@ endfunction
 
 function! nodeinspect#GetStatus()
 	return s:GetStatus()
+endfunction
+
+
+function! nodeinspect#NodeInspectToggleWindow()
+	call s:NodeInspectToggleWindow()
 endfunction
 

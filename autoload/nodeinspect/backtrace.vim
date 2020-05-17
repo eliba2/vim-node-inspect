@@ -1,4 +1,5 @@
 let s:backtrace_win = -1
+let s:backtrace_buf = -1
 
 
 " populates the backtrace window according to the array in a:backtrace
@@ -13,6 +14,14 @@ function! nodeinspect#backtrace#DisplayBacktraceWindow(backtrace)
 		endfor
 		execute 'normal! 1G'
 		" execute "set nomodifiable"
+	endif
+endfunction
+
+
+" hide the backtrace window
+function! nodeinspect#backtrace#HideBacktraceWindow()
+	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
+		execute "hide"
 	endif
 endfunction
 
@@ -46,12 +55,30 @@ function! nodeinspect#backtrace#ClearBacktraceWindow(...)
 endfunction
 
 " create the backtrace window
-function! nodeinspect#backtrace#CreateBacktraceWindow(startWin)
-		" open split for call stack
-		execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Callstack"
-		let s:backtrace_win = win_getid()
+function! nodeinspect#backtrace#ShowBacktraceWindow(startWin)
+	" open split for call stack
+	if s:backtrace_buf == -1
+		execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile statusline=Callstack"
+		let s:backtrace_buf = bufnr('%')
 		set nonu
+	else
+		execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:backtrace_buf 
+	endif
+	let s:backtrace_win = win_getid()
 endfunction
 
 
+" toggles the backtrace window
+function! nodeinspect#backtrace#ToggleBacktraceWindow(startWin)
+	if s:backtrace_buf == -1
+		call nodeinspect#backtrace#ShowBacktraceWindow(a:startWin)
+	else
+		let winIds = win_findbuf(s:backtrace_buf)
+		if len(winIds) == 0
+			call nodeinspect#backtrace#ShowBacktraceWindow(a:startWin)
+		else
+			call nodeinspect#backtrace#HideBacktraceWindow()
+		endif
+	endif
+endfunction
 
