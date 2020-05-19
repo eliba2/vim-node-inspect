@@ -1,4 +1,5 @@
 let s:inspect_win = -1
+let s:inspect_buf = -1
 let s:watches = {}
 
 
@@ -77,6 +78,20 @@ function! s:addToWatchWin(watch)
 endfunction
 
 
+function! nodeinspect#watches#HideWatchWindow()
+	if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
+		execute "hide"
+	endif
+endfunction
+
+
+function! nodeinspect#watches#KillWatchWindow()
+	if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
+		execute "bd!"
+	endif
+endfunction
+
+
 function! nodeinspect#watches#OnWatchesResolved(watches)
 	if len(keys(a:watches)) > 0
 		for watch in keys(a:watches)
@@ -121,12 +136,20 @@ function! nodeinspect#watches#UpdateWatches()
 	call s:updateWatches()
 endfunction
 
-function! nodeinspect#watches#CreateWatchWindow(startWin)
-	execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile bufhidden=wipe noswapfile statusline=Watches"
-	let s:inspect_win = win_getid()
-	set nonu
-	autocmd InsertLeave <buffer> noautocmd call OnTextModification()
-	autocmd BufLeave <buffer> noautocmd call OnTextModification()
+" creates or re-creates the watch window
+function! nodeinspect#watches#ShowWatchWindow(startWin)
+	if s:inspect_buf == -1 || bufwinnr(s:inspect_buf) == -1
+		if s:inspect_buf == -1
+			execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile noswapfile statusline=Watches"
+			let s:inspect_buf = bufnr('%')
+			set nonu
+			autocmd InsertLeave <buffer> noautocmd call OnTextModification()
+			autocmd BufLeave <buffer> noautocmd call OnTextModification()
+		else
+			execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:inspect_buf
+		endif
+		let s:inspect_win = win_getid()
+	endif
 endfunction
 
 
@@ -147,4 +170,13 @@ function! nodeinspect#watches#AddCurrentWordAsWatch()
 	call s:addToWatchWin(wordUnderCursor)
 endfunction
 
+
+" return 1 if the watch window is visible
+function nodeinspect#watches#IsWindowVisible()
+	if s:inspect_buf == -1 || bufwinnr(s:inspect_buf) == -1
+		return 0
+	else
+		return 1
+	endif
+endfunction
 
