@@ -31,7 +31,7 @@ function nodeinspect#repl#StartNodeInspect(session, plugin_path)
 endfunction
 
 " hide the repl window
-function! s:hideReplWindow()
+function! nodeinspect#repl#HideReplWindow()
 	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
 		execute "hide"
 	endif
@@ -39,14 +39,16 @@ endfunction
 
 " create the repl win
 function nodeinspect#repl#ShowReplWindow(startWin)
-	if s:repl_buf == -1
-		execute "bo ".winheight(a:startWin)/3."new"
-		let s:repl_buf = bufnr('%')
-		set nonu
-	else
-		execute "bo ".winheight(a:startWin)/3."new | buffer " . s:repl_buf
+	if s:repl_buf == -1 || bufwinnr(s:repl_buf) == -1
+		if s:repl_buf == -1
+			execute "bo ".winheight(a:startWin)/3."new"
+			let s:repl_buf = bufnr('%')
+			set nonu
+		else
+			execute "bo ".winheight(a:startWin)/3."new | buffer " . s:repl_buf
+		endif
+		let s:repl_win = win_getid()
 	endif
-	let s:repl_win = win_getid()
 endfunction
 
 
@@ -57,17 +59,13 @@ function nodeinspect#repl#KillReplWindow()
 	endif
 endfunction
 
-" show/hide the window. note node-inspect might not be started yet
-function nodeinspect#repl#ToggleReplWindow(startWin)
-	if s:repl_buf == -1
-		call nodeinspect#repl#ShowReplWindow(a:startWin)
+
+" return 1 if the repl window is visible
+function nodeinspect#repl#IsWindowVisible()
+	if s:repl_buf == -1 || bufwinnr(s:repl_buf) == -1
+		return 0
 	else
-		let winIds = win_findbuf(s:repl_buf)
-		if len(winIds) == 0
-			call nodeinspect#repl#ShowReplWindow(a:startWin)
-		else
-			call s:hideReplWindow()
-		endif
+		return 1
 	endif
 endfunction
 

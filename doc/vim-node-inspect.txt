@@ -65,6 +65,10 @@ To stop debugging use NodeInspectStop. It will kill the node instance in case or
 
 NodeInspectStop - Stop debugging (and kill the node instance)
 
+It is possible to toggle the debugging window. As the name suggests,
+
+NodeInspectToggleWindow - Show/Hide the node inspect window
+
 
 ====================================================================
 vim-node-inspect.json configuration file	*VimNodeInspectConfiguration*
@@ -73,7 +77,7 @@ The configuration file name is 'vim-node-inspect.json' and the plugin searches f
 
 "request" - either "launch" or "attach". The former is for executing a script. The second is for connecting to a running node instance.
 "program" - in the case of "launch", this is the script's filename and must be present.
-"args" - in the case of "launch", this optional parameter provides the list of script arguments in an array
+"args" - in the case of "launch", this optional parameter provides the list of script arguments in an array.
 "address" - in the case of "attach", this is the address to connect to. Can be omitted, in this case it defaults to "127.0.0.1".
 "port" - in the case of "attach", this is the port to connect to. Must be present.
 "restart" - in the case of "attach", restarts the debug session if the connection breaks. Useful when using a process monitor such as nodemon or pm2. 

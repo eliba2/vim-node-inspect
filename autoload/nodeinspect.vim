@@ -411,7 +411,7 @@ endfunction
 function! OnNodeInspectExit(...)
 	" make sure windows are closed (in case of stopped buffer)
 	" in nvim there's no such option at all (close the window when closed)
-	call nodeinspect#utils#KillReplWindow()
+	call nodeinspect#repl#KillReplWindow()
 	call nodeinspect#backtrace#KillBacktraceWindow()
 	call nodeinspect#watches#KillWatchWindow()
 	call s:NodeInspectCleanup()
@@ -579,9 +579,17 @@ endfunction
 " toggle the debugger window
 function! s:NodeInspectToggleWindow()
 	let s:start_win = win_getid()
-	call nodeinspect#repl#ToggleReplWindow(s:start_win) 
-	call nodeinspect#backtrace#ToggleBacktraceWindow(s:start_win) 
-	call nodeinspect#watches#ToggleWatchWindow(s:start_win) 
+	" hide or show the windows together
+	let winOpen = nodeinspect#repl#IsWindowVisible() + nodeinspect#backtrace#IsWindowVisible() + nodeinspect#watches#IsWindowVisible()
+	if winOpen == 0
+		call nodeinspect#repl#ShowReplWindow(s:start_win) 
+		call nodeinspect#backtrace#ShowBacktraceWindow(s:start_win) 
+		call nodeinspect#watches#ShowWatchWindow(s:start_win) 
+	else
+		call nodeinspect#repl#HideReplWindow() 
+		call nodeinspect#backtrace#HideBacktraceWindow() 
+		call nodeinspect#watches#HideWatchWindow() 
+	endif
 	call win_gotoid(s:start_win)
 endfunction
 

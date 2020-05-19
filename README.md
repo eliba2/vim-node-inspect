@@ -100,6 +100,8 @@ The following commands are available:
 
 **NodeInspectAddWatch** - Add the word under the cursor to the watch window
 
+**NodeInspectToggleWindow** - Show/Hide the node inspect window
+
 
 There are no default bindings; the following is added for convinience:
 ```
