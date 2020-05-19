@@ -136,8 +136,8 @@ You'll need to configure the local and remote directories when connecting to a r
 {
 	"request": "attach",
 	"port": 9229,
-  "localRoot": "/Users/eli/projects/my-test-project",
-  "remoteRoot": "/app"
+  	"localRoot": "/Users/eli/projects/my-test-project",
+  	"remoteRoot": "/app"
 }
 ```
 Make sure to use full paths.
@@ -145,6 +145,23 @@ Make sure to use full paths.
 ## Remarks
 In beta. Means its useful; things may change or fail.
 **NOT** tested on Windows.
+
+
+## Roadmap
+
+* Debugging window
+	* Detachable 
+	* position change
+* Watches
+	* Auto watches
+	* Open/Close properties
+	* On the fly evaluation (popup)
+* Breakpoints
+	* Breakpoints window
+* Call stack
+	* Auto jump
+* Windows Support
+
 
 ## License
 MIT.
