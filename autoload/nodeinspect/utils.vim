@@ -3,9 +3,11 @@ let s:channel = 0
 
 " send event to node bridge
 function! nodeinspect#utils#SendEvent(e)
-	if has("nvim") && s:channel > 0
-		call chansend(s:channel, a:e)
-	elseif ch_status(s:channel) == "open"
+	if has("nvim") 
+		if s:channel > 0
+			call chansend(s:channel, a:e)
+		endif
+	elseif type(s:channel) == 9 && ch_status(s:channel) == "open"
 		call ch_sendraw(s:channel, a:e)
 	endif
 endfunction
@@ -38,9 +40,11 @@ endfunction
 
 
 function nodeinspect#utils#CloseChannel()
-	if has("nvim") && s:channel > 0
-		call chanclose(s:channel)
-	elseif ch_status(s:channel) == "open"
+	if has("nvim") 
+		if s:channel > 0
+			call chanclose(s:channel)
+		endif
+	elseif type(s:channel) == 9 && ch_status(s:channel) == "open"
 		call ch_close(s:channel)
 	endif	
 endfunction
