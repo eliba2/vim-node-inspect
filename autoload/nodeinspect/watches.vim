@@ -88,6 +88,7 @@ endfunction
 function! nodeinspect#watches#KillWatchWindow()
 	if s:inspect_win != -1 && win_gotoid(s:inspect_win) == 1
 		execute "bd!"
+		let s:inspect_buf = -1
 	endif
 endfunction
 

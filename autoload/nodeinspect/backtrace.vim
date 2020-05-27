@@ -30,6 +30,7 @@ endfunction
 function! nodeinspect#backtrace#KillBacktraceWindow()
 	if s:backtrace_win != -1 && win_gotoid(s:backtrace_win) == 1
 		execute "bd!"
+		let s:backtrace_buf = -1
 	endif
 endfunction
 

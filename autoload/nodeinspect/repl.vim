@@ -56,6 +56,7 @@ endfunction
 function nodeinspect#repl#KillReplWindow()
 	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
 		execute "bd!"
+		let s:repl_buf = -1
 	endif
 endfunction
 
