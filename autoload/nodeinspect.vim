@@ -368,6 +368,16 @@ function! OnNodeMessage(channel, msgs)
 				if s:status == 3
 					let s:status = 1
 				endif
+			elseif mes["m"] == "nd_repl_cont"
+				call nodeinspect#NodeInspectRun()
+			elseif mes["m"] == "nd_repl_kill"
+				call nodeinspect#NodeInspectStop()
+			elseif mes["m"] == "nd_repl_stepover"
+				call nodeinspect#NodeInspectStepOver()
+			elseif mes["m"] == "nd_repl_stepinto"
+				call nodeinspect#NodeInspectStepInto()
+			elseif mes["m"] == "nd_repl_stepout"
+				call nodeinspect#NodeInspectStepOut()
 			else
 				echo "vim-node-inspect: unknown message ".mes["m"]
 			endif

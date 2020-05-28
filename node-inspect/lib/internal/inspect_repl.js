@@ -1039,35 +1039,56 @@ function createRepl(inspector, nvim_bridge_p) {
       },
 
       get run() {
-        return inspector.run();
+				let m = { m: 'nd_repl_cont' };
+				nvim_bridge.send(m);
+				return
+        //return inspector.run();
       },
 
       get kill() {
-        return inspector.killChild();
+				let m = { m: 'nd_repl_kill' };
+				nvim_bridge.send(m);
+				return;
+        //return inspector.killChild();
       },
 
       get restart() {
-        return inspector.run();
+				let m = { m: 'nd_repl_cont' };
+				nvim_bridge.send(m);
+				return
+        //return inspector.run();
       },
 
       get cont() {
-        handleResumed();
-        return Debugger.resume();
+				let m = { m: 'nd_repl_cont' };
+				nvim_bridge.send(m);
+				return;
+        //handleResumed();
+        //return Debugger.resume();
       },
 
       get next() {
-        handleResumed();
-        return Debugger.stepOver();
+				let m = { m: 'nd_repl_stepover' };
+				nvim_bridge.send(m);
+				return;
+        //handleResumed();
+        //return Debugger.stepOver();
       },
 
       get step() {
-        handleResumed();
-        return Debugger.stepInto();
+				let m = { m: 'nd_repl_stepinto' };
+				nvim_bridge.send(m);
+				return;
+        //handleResumed();
+        //return Debugger.stepInto();
       },
 
       get out() {
-        handleResumed();
-        return Debugger.stepOut();
+				let m = { m: 'nd_repl_stepout' };
+				nvim_bridge.send(m);
+				return;
+        //handleResumed();
+        //return Debugger.stepOut();
       },
 
       get pause() {
