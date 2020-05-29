@@ -13,8 +13,8 @@ let s:configuration = {}
 let s:configFileName = 'vim-node-config.json' 
 let s:msgDelimiter = '&&'
 
-highlight NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
-highlight NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan
+highlight default NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
+highlight default NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan
 
 autocmd VimLeavePre * call OnVimLeavePre()
 autocmd BufWritePost * call OnBufWritePost()
