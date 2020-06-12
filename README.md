@@ -173,6 +173,12 @@ In beta. Means its useful; things may change or fail.
 * Windows Support
 
 
+## Contributing
+
+PR are welcome. Open a new issue in case you find a bug; you can also create a PR fixing it yourself of course.
+Please follow the general code style (look@the code) and in your pull request explain the reason for the proposed change.
+
+
 ## License
 MIT.
 
