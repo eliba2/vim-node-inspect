@@ -37,8 +37,9 @@ CONTENTS                                            *VimNodeInspectContents*
     5. Watches................................... |VimNodeInspectWatches|
     6. Debugging commands........................ |VimNodeInspectCommands|
     7. Connecting to running containers.......... |VimNodeInspectContainers|
-    8. Limitation................................ |VimNodeInspectLimitation|
-    9. License................................... |VimNodeInspectLicense|
+		8. Customization ............................ |VimNodeInspectCustomization|
+    9. Limitation................................ |VimNodeInspectLimitation|
+    10.License................................... |VimNodeInspectLicense|
 
 
 
@@ -168,6 +169,15 @@ Both must be absolute. Here's an example of a config file which connects to remo
   "remoteRoot": "/app",
 	"restart": true
 }
+
+
+====================================================================
+Customization							*VimNodeInspectCustomization*
+
+The debugger windows appear on the bottom by default. Set it with the following parameter
+
+let g:nodeinspect_window_pos = 'right'|'left'|'bottom'.
+
 
 
 ====================================================================

@@ -142,6 +142,16 @@ You'll need to configure the local and remote directories when connecting to a r
 ```
 Make sure to use full paths.
 
+
+## Other Customizations
+
+The debugger windows appear on the bottom by default. Change it by using
+
+```
+let g:nodeinspect_window_pos = 'right'|'left'|'bottom'
+```
+
+
 ## Remarks
 In beta. Means its useful; things may change or fail.
 **NOT** tested on Windows.
