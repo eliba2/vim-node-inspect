@@ -531,7 +531,13 @@ function! s:NodeInspectStart()
 		" clear backtrace
 		call nodeinspect#backtrace#ClearBacktraceWindow()
 		" back to repl win
-		call nodeinspect#repl#StartNodeInspect(s:session, s:plugin_path)
+		let repl_result = nodeinspect#repl#StartNodeInspect(s:session, s:plugin_path)
+		if repl_result != 0
+			echom "can't start node-inspect, node not found"
+			call nodeinspect#backtrace#ClearBacktraceWindow('Cant find nodejs')
+			call win_gotoid(s:start_win)
+			return
+		endif
 		" switch back to start buf
 		call win_gotoid(s:start_win)
 		" wait for bridge conenction
