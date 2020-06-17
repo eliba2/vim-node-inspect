@@ -154,7 +154,7 @@ let g:nodeinspect_window_pos = 'right'|'left'|'bottom'
 
 ## Remarks
 In beta. Means its useful; things may change or fail.
-**NOT** tested on Windows.
+Tested on Linux (debian), OSX, Windows.
 
 
 ## Roadmap

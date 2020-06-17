@@ -942,7 +942,7 @@ function createRepl(inspector, nvim_bridge_p) {
 		/* notify nvim */
 		//getArguments(); // call get arguments and set the parameters to the stop function to display in the watch window
 		let scriptPrefix = ''; 
-		if (scriptUrl && scriptUrl.length && scriptUrl[0] != '/' && scriptUrl[0] != '[') {
+		if (scriptUrl && scriptUrl.length && scriptUrl[0] != '/' && scriptUrl[0] != '[' && process.platform != 'win32') {
 			scriptPrefix = '/';
 		}
 		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};

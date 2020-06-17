@@ -50,7 +50,8 @@ class StartupError extends Error {
   }
 }
 
-function portIsFree(host, port, timeout = 2000) {
+// see https://github.com/nodejs/node-inspect/issues/48
+function portIsFree(host, port, timeout = 9999) {
   if (port === 0) return Promise.resolve(); // Binding to a random port.
 
   const retryDelay = 150;

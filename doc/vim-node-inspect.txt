@@ -183,7 +183,7 @@ let g:nodeinspect_window_pos = 'right'|'left'|'bottom'.
 ====================================================================
 Limitation							*VimNodeInspectLimitation*
 
-Not tested on Windows and probably won't work. It a relatively small change to make it there, maybe I'll add it if I have access to a windows machine.
+Windows container support was not tested. It might or might not work. 
 
 
 
