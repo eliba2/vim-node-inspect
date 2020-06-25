@@ -10,7 +10,6 @@ let s:session = {}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:configuration = {}
-let s:configFileName = 'vim-node-config.json' 
 let s:msgDelimiter = '&&'
 let g:nodeinspect_window_pos = get(g:, 'nodeinspect_window_pos', "bottom")
 

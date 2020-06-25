@@ -26,6 +26,7 @@ const Repl = require('repl');
 const util = require('util');
 const vm = require('vm');
 const fileURLToPath = require('url').fileURLToPath;
+const tokenizer = require('../../ext/tokenize');
 
 const debuglog = util.debuglog('inspect');
 
@@ -923,8 +924,20 @@ function createRepl(inspector, nvim_bridge_p) {
   }
 
 	// gets a method arguments, if exists. called on break
-	function getArguments() {
-		//console.log(evalInCurrentContext(f);
+	async function getTokens(file,line) {
+		let tokens = tokenizer.getArgs(file,line,5);
+		var resolvedTokens = {};
+		let promises = Object.keys(tokens).map(async (token) => {
+			let args = await resolveWatches(tokens[token]);
+			// remove n/a's
+			let resolvedArgs = {};
+			Object.keys(args).filter(key => args[key] != "n\\a").map( key => resolvedArgs[key] = args[key] );
+			if (Object.keys(resolvedArgs).length > 0) {
+				resolvedTokens[token] = {...resolvedArgs};
+			}
+		});
+		await Promise.all(promises);
+		return resolvedTokens;
 	}
 
   Debugger.on('paused', ({ callFrames, reason /* , hitBreakpoints */ }) => {
@@ -939,13 +952,13 @@ function createRepl(inspector, nvim_bridge_p) {
 		const scriptUrl = script ? getAbsolutePath(script.url) : '[unknown]';
 
     const header = `${breakType} in ${scriptUrl}:${lineNumber + 1}`;
-		/* notify nvim */
-		//getArguments(); // call get arguments and set the parameters to the stop function to display in the watch window
 		let scriptPrefix = ''; 
 		if (scriptUrl && scriptUrl.length && scriptUrl[0] != '/' && scriptUrl[0] != '[' && process.platform != 'win32') {
 			scriptPrefix = '/';
 		}
-		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames)};
+		/* notify nvim */
+		let tokens = getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
+		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames), tokens: tokens};
 		nvim_bridge.send(m);
 
     inspector.suspendReplWhile(() =>
