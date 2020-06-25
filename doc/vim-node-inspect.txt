@@ -122,6 +122,9 @@ And here's one for attaching to a running script and restarting on session break
 }
 
 
+It is possible to have several config files in case the workspace has several projects who share the same root. In case the configuration file is not found in the current working directory, the curent buffer's directory is searched all the way to the top (as long it is a descendant of the working directory).
+
+
 ====================================================================
 Setting breakpoints				*VimNodeInspectBreakpoints*
 

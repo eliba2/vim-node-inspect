@@ -75,6 +75,11 @@ When using an application to monitor changes and restart the node session (such 
 ```
 
 
+### Other possible configuration file locations
+
+It is possible to have several config files in case the workspace has several projects who share the same root. In case the configuration file is not found in the current working directory, the curent buffer's directory is searched all the way to the top (as long it is a descendant of the working directory).
+
+
 
 ## Available Commands
 
@@ -154,6 +159,7 @@ let g:nodeinspect_window_pos = 'right'|'left'|'bottom'
 
 ## Remarks
 In beta. Means its useful; things may change or fail.
+
 Tested on Linux (debian), OSX, Windows.
 
 

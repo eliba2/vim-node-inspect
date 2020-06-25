@@ -28,17 +28,40 @@ function! s:ReplaceMacros(str)
 	return replaced
 endfunction
 
+" find the config file path. if its not in the currend working directory, try
+" going up from the current buffer directory. Returns the directory or empty
+" string if failed to find the config file.
+function s:GetConfigFilePath()
+	let configFilePath = getcwd() . '/' . s:configFileName
+	if filereadable(configFilePath)
+		return configFilePath
+	endif
+	" if the file is not found in pwd and the script is a decedant, try going up  
+	let expandString = '%:p:h'
+	let traverseDir = expand(expandString)
+	while stridx(traverseDir, getcwd()) != -1
+		let configFilePath = traverseDir . '/' . s:configFileName
+		if filereadable(configFilePath)
+			return configFilePath
+		endif
+		let expandString = expandString . ':h'
+		let traverseDir = expand(expandString)
+	endwhile
+	return ''
+endfunction
+
+
 
 " try and load the config file; it migth not exist, in this case use the
 " defaults. returns 0 on success, !0 on failure.
 function! nodeinspect#config#LoadConfigFile(configuration, session)
 	"let a:configuration = {}
-	let configFilePath = getcwd() . '/' . s:configFileName
+	let configFilePath = s:GetConfigFilePath()
 	let fullFile = ''
 	" clear previous sessoin config
 	call s:removeSessionKeys(a:session,"localRoot","remoteRoot")
 
-	if filereadable(configFilePath)
+	if configFilePath != ''
 		" indicate this configuration is from file
 		let a:session["configUsed"] = 1
 		"read file
