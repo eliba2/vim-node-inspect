@@ -146,6 +146,10 @@ There is no command for removing a watch; remove it by deleting it from the watc
 NodeInspectAddWatch - Add the word under the cursor to the watch window
 
 
+Auto watches will add the variables near the breakpoint location into the watch window (and remove them when of no use). It is done using syntactic analysis using Esprima (http://esprima.org/). It is currently experimental and requires setting the following which defaults to 0:
+
+let g:nodeinspect_auto_watch = 1
+
 
 ====================================================================
 Debugging commands			*VimNodeInspectCommands*

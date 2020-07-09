@@ -35,6 +35,9 @@ function! nodeinspect#utils#ConnectToBridge()
 		endif
 		let retries -= 1
 	endwhile
+	if connected == 1
+		call nodeinspect#utils#SendEvent('{"m": "nd_init", "autoWatches":'. g:nodeinspect_auto_watch .' }')
+	endif
 	return connected
 endfunction
 

@@ -1,6 +1,7 @@
 let s:inspect_win = -1
 let s:inspect_buf = -1
 let s:watches = {}
+let s:auto_watches = {}
 
 
 function! OnTextModification()
@@ -21,6 +22,9 @@ function s:Draw()
 		for watch in keys(s:watches)
 			call append(getline('$'), watch."      ".s:watches[watch])
 		endfor
+		for watch in keys(s:auto_watches)
+			call append(getline('$'), "[A]" . watch."      ".s:auto_watches[watch])
+		endfor
 		" endofupdate
 		call win_gotoid(cur_win)
 		" execute "set modifiable"
@@ -40,7 +44,8 @@ function s:RecalcWatchesKeys()
 		let totalLines = line('$')
 		while currentLine <= totalLines
 			let line = trim(getline(currentLine))
-			if len(line) != 0
+			" don't recalc autos
+			if len(line) != 0 && line[:2] != "[A]"
 				let firstWord = split(line)[0]	
 				let s:watches[firstWord] = "n/a"
 			endif
@@ -189,4 +194,27 @@ function nodeinspect#watches#IsWindowVisible()
 		return 1
 	endif
 endfunction
+
+
+function nodeinspect#watches#ShowTokens(tokens)
+	let s:auto_watches = {}
+	if len(keys(a:tokens)) > 0
+		for tokenLine in keys(a:tokens)
+			if len(keys(a:tokens[tokenLine])) > 0
+				let tokenStrings = []
+				for token in keys(a:tokens[tokenLine])
+					" only add this if not added
+					if has_key(s:auto_watches, token) == 0
+						let s:auto_watches[token] = a:tokens[tokenLine][token]
+					endif
+					"call add(tokenStrings, [" ".token.": ", 'Constant'])
+					"call add(tokenStrings, [a:tokens[tokenLine][token], 'Comment'])
+				endfor
+				"call nvim_buf_set_virtual_text(0, -1, str2nr(tokenLine) - 1, tokenStrings, {})
+			endif
+		endfor
+	endif
+	call s:Draw()
+endfunction
+
 
