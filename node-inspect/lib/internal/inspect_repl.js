@@ -27,8 +27,9 @@ const util = require('util');
 const vm = require('vm');
 const fileURLToPath = require('url').fileURLToPath;
 const tokenizer = require('../../ext/tokenize');
-
 const debuglog = util.debuglog('inspect');
+
+var doLexicalParse = 0;
 
 const SHORTCUTS = {
   cont: 'c',
@@ -40,6 +41,7 @@ const SHORTCUTS = {
   clearBreakpoint: 'cb',
   run: 'r',
 };
+
 
 const HELP = `
 run, restart, r       Run the application or reconnect
@@ -925,7 +927,8 @@ function createRepl(inspector, nvim_bridge_p) {
 
 	// gets a method arguments, if exists. called on break
 	async function getTokens(file,line) {
-		let tokens = tokenizer.getTokens(file,line,1);
+		const tokRad = 2;
+		let tokens = tokenizer.getTokens(file,line,tokRad);
 		var resolvedTokens = {};
 		let promises = Object.keys(tokens).map(async (token) => {
 			let args = await resolveWatches(tokens[token]);
@@ -957,7 +960,11 @@ function createRepl(inspector, nvim_bridge_p) {
 			scriptPrefix = '/';
 		}
 		/* notify nvim */
-		let tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
+		let tokens = {};
+		if (doLexicalParse) {
+			tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
+		}
+		//console.log("=> got ",tokens);
 		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames), tokens: tokens};
 		nvim_bridge.send(m);
 
@@ -1246,6 +1253,12 @@ function createRepl(inspector, nvim_bridge_p) {
 	async function handleVimEvents(message) {
 
 		switch (message.m) {
+			case 'nd_init':
+				// init message. set state
+				if (message.autoWatches == 1) {
+					doLexicalParse = 1;	
+				}
+				break;
 			case 'nd_next':
 				if (isRunning) {
 					print(`Only available when paused(1)`);

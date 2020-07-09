@@ -127,6 +127,13 @@ The breakpoints signs appear in the resolved locations.
 There are two ways to add a watch. One is to use the *NodeInspectAddWatch* command which will add the word under the cursor as a watch. The other is by directly editing the watch window: this will resolve the watches, one per line.
 Remove a watch by deleting it from the watch window.
 
+### Auto watches
+
+Auto watches will add the variables near the breakpoint location into the watch window (and remove them when of no use). It is done using syntactic analysis using Esprima (http://esprima.org/). It is currently experimental and requires setting the following which defaults to 0:
+
+```
+let g:nodeinspect_auto_watch = 1
+```
 
 ## Connecting to a running container
 
