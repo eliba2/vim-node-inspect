@@ -190,3 +190,20 @@ function nodeinspect#watches#IsWindowVisible()
 	endif
 endfunction
 
+
+function nodeinspect#watches#ShowTokens(tokens)
+	if len(keys(a:tokens)) > 0
+		for tokenLine in keys(a:tokens)
+			if len(keys(a:tokens[tokenLine])) > 0
+				let tokenStrings = []
+				for token in keys(a:tokens[tokenLine])
+					call add(tokenStrings, [" ".token.": ", 'Constant'])
+					call add(tokenStrings, [a:tokens[tokenLine][token], 'Comment'])
+				endfor
+				call nvim_buf_set_virtual_text(0, -1, str2nr(tokenLine) - 1, tokenStrings, {})
+			endif
+		endfor
+	endif
+endfunction
+
+

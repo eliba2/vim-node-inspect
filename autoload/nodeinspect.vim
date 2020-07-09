@@ -301,10 +301,10 @@ function! s:onDebuggerStopped(mes)
 		execute "edit " . localFile
 		execute ":" . a:mes["line"]
 		call s:addSign(localFile, a:mes["line"])
+		" add relevant tokens
+		call nodeinspect#watches#ShowTokens(a:mes["tokens"])
 	else
-		if !readable
-			call nodeinspect#backtrace#ClearBacktraceWindow('Debugger Stopped. Source file is not available')
-		endif
+		call nodeinspect#backtrace#ClearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
 	" request watches update	
 	call nodeinspect#watches#UpdateWatches()

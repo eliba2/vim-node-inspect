@@ -925,7 +925,7 @@ function createRepl(inspector, nvim_bridge_p) {
 
 	// gets a method arguments, if exists. called on break
 	async function getTokens(file,line) {
-		let tokens = tokenizer.getArgs(file,line,5);
+		let tokens = tokenizer.getTokens(file,line,1);
 		var resolvedTokens = {};
 		let promises = Object.keys(tokens).map(async (token) => {
 			let args = await resolveWatches(tokens[token]);
@@ -940,7 +940,7 @@ function createRepl(inspector, nvim_bridge_p) {
 		return resolvedTokens;
 	}
 
-  Debugger.on('paused', ({ callFrames, reason /* , hitBreakpoints */ }) => {
+  Debugger.on('paused', async ({ callFrames, reason /* , hitBreakpoints */ }) => {
 		isRunning = false;
     // Save execution context's data
     currentBacktrace = Backtrace.from(callFrames);
@@ -957,7 +957,7 @@ function createRepl(inspector, nvim_bridge_p) {
 			scriptPrefix = '/';
 		}
 		/* notify nvim */
-		let tokens = getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
+		let tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
 		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames), tokens: tokens};
 		nvim_bridge.send(m);
 
