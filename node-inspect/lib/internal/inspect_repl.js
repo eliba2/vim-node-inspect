@@ -962,7 +962,7 @@ function createRepl(inspector, nvim_bridge_p) {
 		/* notify nvim */
 		let tokens = {};
 		if (doLexicalParse) {
-			tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber + 1); // call get arguments and set the parameters to the stop function to display in the watch window
+			tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber ); // call get arguments and set the parameters to the stop function to display in the watch window
 		}
 		//console.log("=> got ",tokens);
 		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames), tokens: tokens};

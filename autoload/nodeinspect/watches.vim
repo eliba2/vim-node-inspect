@@ -2,7 +2,7 @@ let s:inspect_win = -1
 let s:inspect_buf = -1
 let s:watches = {}
 let s:auto_watches = {}
-
+let s:auto_sign = "A "
 
 function! OnTextModification()
 	call s:RecalcWatchesKeys()
@@ -23,7 +23,7 @@ function s:Draw()
 			call append(getline('$'), watch."      ".s:watches[watch])
 		endfor
 		for watch in keys(s:auto_watches)
-			call append(getline('$'), "[A]" . watch."      ".s:auto_watches[watch])
+			call append(getline('$'), s:auto_sign . watch."      ".s:auto_watches[watch])
 		endfor
 		" endofupdate
 		call win_gotoid(cur_win)
@@ -45,7 +45,7 @@ function s:RecalcWatchesKeys()
 		while currentLine <= totalLines
 			let line = trim(getline(currentLine))
 			" don't recalc autos
-			if len(line) != 0 && line[:2] != "[A]"
+			if len(line) != 0 && line[:(len(s:auto_sign)-1)] != s:auto_sign
 				let firstWord = split(line)[0]	
 				let s:watches[firstWord] = "n/a"
 			endif
