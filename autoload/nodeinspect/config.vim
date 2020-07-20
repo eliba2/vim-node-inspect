@@ -14,6 +14,7 @@ endfunction
 function! nodeinspect#config#SetConfigurationDefaults(session)
 	let a:session["restart"] = 0
 	let a:session["configUsed"] = 0
+	let a:session["cwd"] = getcwd()
 endfunction
 
 
@@ -121,6 +122,14 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 					let a:session["restart"] = 1
 				else
 					let a:session["restart"] = 0
+				endif
+			endif
+			if has_key(configObj,"cwd") == 1
+				if type(configObj["cwd"]) == 1
+					let a:session["cwd"] = s:ReplaceMacros(configObj["cwd"])
+				else
+					echom "error reading cwd in vim-node-inspect"
+					return 1
 				endif
 			endif
 

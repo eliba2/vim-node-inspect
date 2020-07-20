@@ -39,7 +39,8 @@ A sample configuration for launch would be:
 {
 	"request": "launch",
 	"program": "/Users/eli/Tests/test.js",
-	"args": ["first", "second"]
+	"args": ["first", "second"],
+	"cwd": "/path/to/dir"
 }
 ```
 
@@ -51,6 +52,7 @@ Use absolute paths. "${workspaceFolder}" can be used, it equals to the current w
 
 **"port"** - in the case of "attach", this is the port to connect to. Must be present.
 
+**"cmd"** - working directory for running the script. Defaults to (n)vims current directory. Optional.
 
 A sample configuration for attach would be:
 

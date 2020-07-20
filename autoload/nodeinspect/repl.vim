@@ -23,12 +23,12 @@ function nodeinspect#repl#StartNodeInspect(session, plugin_path)
 	endif
 	" open terminal
 	if has("nvim")
-		let term_id = termopen(cmd_line, {'on_exit': 'OnNodeInspectExit'})
+		let term_id = termopen(cmd_line, {'on_exit': 'OnNodeInspectExit', 'cwd': a:session["cwd"]})
 		if term_id == -1
 			return 1
 		endif
 	else
-		let term_id = term_start(cmd_line, {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill'})
+		let term_id = term_start(cmd_line, {'curwin': 1, 'exit_cb': 'OnNodeInspectExit', 'term_finish': 'close', 'term_kill': 'kill', 'cwd': a:session["cwd"]})
 		" 0 will be returned only if the window opening fails
 		if term_id == 0
 			return 1

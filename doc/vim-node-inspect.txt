@@ -84,6 +84,7 @@ The configuration file name is 'vim-node-inspect.json' and the plugin searches f
 "restart" - in the case of "attach", restarts the debug session if the connection breaks. Useful when using a process monitor such as nodemon or pm2. 
 "localRoot" - defines the local directory when connecting to a running container. See VimNodeInspectContainers. 
 "remoteRoot" -  defines the remote directory when connecting to a running container. See VimNodeInspectContainers. 
+"cmd" - working directory for running the script. Defaults to (n)vims current directory. Optional.
 
 All directories must be absolute. "${workspaceFolder}" can be used, it equals to the current working directory (:pwd).
 
