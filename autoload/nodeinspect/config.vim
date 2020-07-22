@@ -15,6 +15,8 @@ function! nodeinspect#config#SetConfigurationDefaults(session)
 	let a:session["restart"] = 0
 	let a:session["configUsed"] = 0
 	let a:session["cwd"] = getcwd()
+	let a:session["envFile"] = ""
+	let a:session["env"] = ""
 endfunction
 
 
@@ -55,8 +57,8 @@ endfunction
 
 " try and load the config file; it migth not exist, in this case use the
 " defaults. returns 0 on success, !0 on failure.
-function! nodeinspect#config#LoadConfigFile(configuration, session)
-	"let a:configuration = {}
+function! nodeinspect#config#LoadConfigFile(session)
+	let configuration = {}
 	let configFilePath = s:GetConfigFilePath()
 	let fullFile = ''
 	" clear previous sessoin config
@@ -74,20 +76,20 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 		let configObj = json_decode(fullFile)
 		if type(configObj) == 4 
 			if has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
-				let a:configuration["localRoot"] = s:ReplaceMacros(configObj["localRoot"])
-				let a:configuration["remoteRoot"] = configObj["remoteRoot"]
+				let configuration["localRoot"] = s:ReplaceMacros(configObj["localRoot"])
+				let configuration["remoteRoot"] = configObj["remoteRoot"]
 				" add trailing backslash if not present. it will normalize both inputs
 				" in case the user add one with and one without
-				if a:configuration["localRoot"][-1:-1] != '/' 
-					let a:configuration["localRoot"] = a:configuration["localRoot"] . '/'
+				if configuration["localRoot"][-1:-1] != '/' 
+					let configuration["localRoot"] = configuration["localRoot"] . '/'
 				endif
-				if a:configuration["remoteRoot"][-1:-1] != '/' 
-					let a:configuration["remoteRoot"] = a:configuration["remoteRoot"] . '/'
+				if configuration["remoteRoot"][-1:-1] != '/' 
+					let configuration["remoteRoot"] = configuration["remoteRoot"] . '/'
 				endif
 			endif
 			if has_key(configObj,"request") == 1
 				if configObj["request"] == 'attach' || configObj["request"] == 'launch'
-					let a:configuration["request"] = configObj["request"]
+					let configuration["request"] = configObj["request"]
 				else
 					echom "error reading launch in vim-node-inspect"
 					return 1
@@ -95,7 +97,7 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 			endif
 			if has_key(configObj,"program") == 1
 				if type(configObj["program"]) == 1
-					let a:configuration["program"] = s:ReplaceMacros(configObj["program"])
+					let configuration["program"] = s:ReplaceMacros(configObj["program"])
 				else
 					echom "error reading program in vim-node-inspect"
 					return 1
@@ -103,7 +105,7 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 			endif
 			if has_key(configObj,"address") == 1
 				if type(configObj["address"]) == 1
-					let a:configuration["address"] = configObj["address"]
+					let configuration["address"] = configObj["address"]
 				else
 					echom "error reading address in vim-node-inspect"
 					return 1
@@ -111,7 +113,7 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 			endif
 			if has_key(configObj,"port") == 1
 				if type(configObj["port"]) == 0
-					let a:configuration["port"] = configObj["port"]
+					let configuration["port"] = configObj["port"]
 				else
 					echom "error reading port in vim-node-inspect"
 					return 1
@@ -132,46 +134,66 @@ function! nodeinspect#config#LoadConfigFile(configuration, session)
 					return 1
 				endif
 			endif
-
-
+			if has_key(configObj,"envFile") == 1
+				if type(configObj["envFile"]) == 1
+					let envFile = s:ReplaceMacros(configObj["envFile"])
+					if filereadable(expand(envFile))
+						let a:session["envFile"] = envFile
+					else
+						echom "error reading envfile in vim-node-inspect"
+						return 1
+					end
+				else
+					echom "error reading envfile in vim-node-inspect"
+					return 1
+				endif
+			endif
+			if has_key(configObj,"env") == 1
+				if type(configObj["env"]) == 4
+					let a:session["env"] = json_encode(configObj["env"])
+				else
+					echom "error reading envs in vim-node-inspect"
+					return 1
+				endif
+			endif
 			" validate config and setup session
-			if has_key(a:configuration, "request") == 1 
-				if a:configuration["request"] == 'attach' 
-					if has_key(a:configuration, "port") == 0
+			if has_key(configuration, "request") == 1 
+				if configuration["request"] == 'attach' 
+					if has_key(configuration, "port") == 0
 						echom "vim-node-inspect config error, attach without a port"
 						return 1
 					else
-						let a:session["request"] = a:configuration["request"]
-						let a:session["port"] = a:configuration["port"]
+						let a:session["request"] = configuration["request"]
+						let a:session["port"] = configuration["port"]
 						" address defaults to localhost
-						if has_key(a:configuration, "address")
-							let a:session["address"] = a:configuration["address"]
+						if has_key(configuration, "address")
+							let a:session["address"] = configuration["address"]
 						else
 							let a:session["address"] = "127.0.0.1"
 						endif
 					endif
 				endif
-				if a:configuration["request"] == 'launch' 
-					if has_key(a:configuration, "restart") == 1
+				if configuration["request"] == 'launch' 
+					if has_key(configuration, "restart") == 1
 						echom "vim-node-inspect config error, restart in invalid in launch mode"
 						return 1
 					endif
-					if has_key(a:configuration, "program") == 0
+					if has_key(configuration, "program") == 0
 						echom "vim-node-inspect config error, launch without a program"
 						return 1
 					else
-						let a:session["request"] = a:configuration["request"]
-						let a:session["script"] = a:configuration["program"]
+						let a:session["request"] = configuration["request"]
+						let a:session["script"] = configuration["program"]
 					endif
 				endif
 			endif
-			if (has_key(a:configuration, "localRoot") == 1 || has_key(a:configuration, "remoteRoot") == 1)
-				if ((has_key(a:configuration, "localRoot") == 1 && has_key(a:configuration, "remoteRoot") == 0) || (has_key(a:configuration, "localRoot") == 0 && has_key(a:configuration, "remoteRoot") == 1))
+			if (has_key(configuration, "localRoot") == 1 || has_key(configuration, "remoteRoot") == 1)
+				if ((has_key(configuration, "localRoot") == 1 && has_key(configuration, "remoteRoot") == 0) || (has_key(configuration, "localRoot") == 0 && has_key(configuration, "remoteRoot") == 1))
 					echom 'vim-node-inspect directories set error'
 					return 1
 				else
-					let a:session["localRoot"] = a:configuration["localRoot"]
-					let a:session["remoteRoot"] = a:configuration["remoteRoot"]
+					let a:session["localRoot"] = configuration["localRoot"]
+					let a:session["remoteRoot"] = configuration["remoteRoot"]
 				endif
 			endif
 			" read each line of args in order to alter the value

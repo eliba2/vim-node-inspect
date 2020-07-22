@@ -15,7 +15,7 @@ endfunction
 
 " connects to the bridge, up to 3s. 
 " returns 1 if connected successfully, otherwise 0
-function! nodeinspect#utils#ConnectToBridge()
+function! nodeinspect#utils#ConnectToBridge(session)
 	let retries = 15
 	let connected = 0
 	while retries >= 0
@@ -36,7 +36,7 @@ function! nodeinspect#utils#ConnectToBridge()
 		let retries -= 1
 	endwhile
 	if connected == 1
-		call nodeinspect#utils#SendEvent('{"m": "nd_init", "autoWatches":'. g:nodeinspect_auto_watch .' }')
+		call nodeinspect#utils#SendEvent('{"m": "nd_init", "autoWatches":'. g:nodeinspect_auto_watch .  ', "envFile": "'. a:session["envFile"] .'" , "env": "'. escape(a:session["env"], '"') . '"}')
 	endif
 	return connected
 endfunction

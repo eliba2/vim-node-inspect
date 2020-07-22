@@ -85,6 +85,8 @@ The configuration file name is 'vim-node-inspect.json' and the plugin searches f
 "localRoot" - defines the local directory when connecting to a running container. See VimNodeInspectContainers. 
 "remoteRoot" -  defines the remote directory when connecting to a running container. See VimNodeInspectContainers. 
 "cmd" - working directory for running the script. Defaults to (n)vims current directory. Optional.
+"envFile" - path to a file containing environment variables. Optional.
+"env" - JSON object containing environment variables definition. Takes precedence over envFile. Optional.
 
 All directories must be absolute. "${workspaceFolder}" can be used, it equals to the current working directory (:pwd).
 
@@ -121,6 +123,16 @@ And here's one for attaching to a running script and restarting on session break
 	"port": 9229,
 	"restart": true
 }
+
+Here's an example of using environment variables with envFile and env. The later takes precedence. 
+
+{
+	"request": "launch",
+	"program": "${workspaceFolder}/test.js",
+	"envFile": "${workspaceFolder}/.env",
+	"env": { "MY_ADDITIONAL_VAR": "XYZ"   }
+}
+
 
 
 It is possible to have several config files in case the workspace has several projects who share the same root. In case the configuration file is not found in the current working directory, the curent buffer's directory is searched all the way to the top (as long it is a descendant of the working directory).

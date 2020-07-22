@@ -1,0 +1,11 @@
+.nyc_output/
+examples/
+flow-typed/
+tests/
+.editorconfig
+.flowconfig
+.npmignore
+.travis.yml
+appveyor.yml
+CONTRIBUTING.md
+dotenv.png

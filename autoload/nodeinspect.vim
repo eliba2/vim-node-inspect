@@ -9,7 +9,6 @@ let s:breakpoints = {}
 let s:session = {}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
-let s:configuration = {}
 let s:msgDelimiter = '&&'
 let g:nodeinspect_window_pos = get(g:, 'nodeinspect_window_pos', "bottom")
 let g:nodeinspect_auto_watch = get(g:, 'nodeinspect_auto_watch', 0)
@@ -110,7 +109,7 @@ function! s:getLocalFilePath(file)
 	endif
 	" files arrive relative(?) is so, add '/'
 	let preFileStr = ''
-	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:configuration["remoteRoot"]) > 1 && s:configuration["remoteRoot"][0:0] == '/'
+	"if strlen(a:file)>1 && a:file[0:0] != '/' && strlen(s:session["remoteRoot"]) > 1 && s:session["remoteRoot"][0:0] == '/'
 		"let preFileStr = '/'
 	"endif
 	" strip file of its path, add it to the local
@@ -510,8 +509,7 @@ function! s:NodeInspectStart()
 	call  nodeinspect#config#SetConfigurationDefaults(s:session)
 	" load configuration. if execution is specified there it shall be used.  
 	" clear configuration in here as it can't be done when passing a variable
-	let s:configuration = {}
-	if nodeinspect#config#LoadConfigFile(s:configuration, s:session) != 0
+	if nodeinspect#config#LoadConfigFile(s:session) != 0
 		return
 	endif
 	" if app, must start with a file
@@ -541,7 +539,7 @@ function! s:NodeInspectStart()
 		" switch back to start buf
 		call win_gotoid(s:start_win)
 		" wait for bridge conenction
-		let connected = nodeinspect#utils#ConnectToBridge()
+		let connected = nodeinspect#utils#ConnectToBridge(s:session)
 		if connected == 0
 			" can't connect. exit.
 			echom 'cant connect to node-bridge'

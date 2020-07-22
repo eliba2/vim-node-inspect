@@ -54,6 +54,10 @@ Use absolute paths. "${workspaceFolder}" can be used, it equals to the current w
 
 **"cmd"** - working directory for running the script. Defaults to (n)vims current directory. Optional.
 
+**"envFile"** - path to a file containing environment variables. Optional.
+
+**"env"** - JSON object containing environment variables definition. Takes precedence over envFile. Optional.
+
 A sample configuration for attach would be:
 
 ```

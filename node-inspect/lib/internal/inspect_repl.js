@@ -1258,6 +1258,18 @@ function createRepl(inspector, nvim_bridge_p) {
 				if (message.autoWatches == 1) {
 					doLexicalParse = 1;	
 				}
+				// env file config will be overridden by specific env file configuration
+				if (message.envFile) {
+					let config = require('../../dotenv').config({ path: message.envFile });
+				}
+				if (message.env) {
+					try {
+						let envs = JSON.parse(message.env);
+						Object.keys(envs).map(s => process.env[s] = envs[s]);
+					} catch (e) {
+						console.log("error parsing env object", e);
+					}
+				}
 				break;
 			case 'nd_next':
 				if (isRunning) {
