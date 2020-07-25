@@ -271,6 +271,7 @@ function! s:onDebuggerStopped(mes)
 			let s:session["initialLaunchBreak"] = 0
 			" if there are any breakpoints to set, set them now. If started running, execution will
 			" continue when resolved
+			let breakpointsRequest = 0
 			if len(s:breakpoints) > 0
 				let remoteBreakpoints = s:getRemoteBreakpointsObj(s:breakpoints)
 				" that saves me from deepcopy
@@ -279,9 +280,17 @@ function! s:onDebuggerStopped(mes)
 				call s:NodeInspectRemoveAllBreakpoints(0)
 				" send breakpoints, if any
 				call nodeinspect#utils#SendEvent('{"m": "nd_setbreakpoints", "breakpoints":' . remoteBreakpointsJson . '}')
-			else
-				" no breakpoints to resolve
-				if s:session["startRun"] == 1 
+				" indicate breakpoints were requested
+				let breakpointsRequest = 1
+			endif
+			" should start running?
+			if s:session["startRun"] == 1 
+				" if breakpoints were set, the running will resume when it resolves.
+				" so return and don't do nothing
+				if breakpointsRequest == 1
+					return
+				else
+					" no breakpoints to resolve - continue running
 					let s:session["startRun"] = 0 
 					sleep 150m
 					call s:NodeInspectRun()
