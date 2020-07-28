@@ -28,8 +28,7 @@ const vm = require('vm');
 const fileURLToPath = require('url').fileURLToPath;
 const tokenizer = require('../../ext/tokenize');
 const debuglog = util.debuglog('inspect');
-
-var doLexicalParse = 0;
+var doAutoWatches = 1;
 
 const SHORTCUTS = {
   cont: 'c',
@@ -926,12 +925,25 @@ function createRepl(inspector, nvim_bridge_p) {
   }
 
 	// gets a method arguments, if exists. called on break
-	async function getTokens(file,line) {
-		const tokRad = 2;
-		let tokens = tokenizer.getTokens(file,line,tokRad);
+	async function getTokens(file) {
+		const dontDisplay = {
+			"exports": true,
+			"require": true,
+			"module": true,
+			"exports": true,
+			"__filename": true,
+			"__dirname": true
+		}
+		let tokensRaw = await evalInCurrentContext('.scope');
+		let tokensUnfiltered = {};
+		let tokens = {};
+		if (Array.isArray(tokensRaw)) {
+			tokensRaw.map(s => Array.isArray(s) ? s.map(s0 => tokensUnfiltered[s0] = '') : tokensUnfiltered[s] = '' );
+		}
+		Object.keys(tokensUnfiltered).filter(s => dontDisplay[s] !== true).map(s => tokens[s] = true);;
 		var resolvedTokens = {};
 		let promises = Object.keys(tokens).map(async (token) => {
-			let args = await resolveWatches(tokens[token]);
+			let args = await resolveWatches(tokens);
 			// remove n/a's
 			let resolvedArgs = {};
 			Object.keys(args).filter(key => args[key] != "n\\a").map( key => resolvedArgs[key] = args[key] );
@@ -961,10 +973,9 @@ function createRepl(inspector, nvim_bridge_p) {
 		}
 		/* notify nvim */
 		let tokens = {};
-		if (doLexicalParse) {
-			tokens = await getTokens(`${scriptPrefix}${scriptUrl}` ,lineNumber ); // call get arguments and set the parameters to the stop function to display in the watch window
+		if (doAutoWatches) {
+			tokens = await getTokens(`${scriptPrefix}${scriptUrl}`); // call get arguments and set the parameters to the stop function to display in the watch window
 		}
-		//console.log("=> got ",tokens);
 		let m = { m: 'nd_stopped', file: `${scriptPrefix}${scriptUrl}`, line: lineNumber + 1, backtrace: Backtrace.getList(callFrames), tokens: tokens};
 		nvim_bridge.send(m);
 
@@ -1255,8 +1266,9 @@ function createRepl(inspector, nvim_bridge_p) {
 		switch (message.m) {
 			case 'nd_init':
 				// init message. set state
-				if (message.autoWatches == 1) {
-					doLexicalParse = 1;	
+
+				if (message.autoWatches == 0) {
+					doAutoWatches = 0;
 				}
 				// env file config will be overridden by specific env file configuration
 				if (message.envFile) {

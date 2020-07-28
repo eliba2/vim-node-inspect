@@ -11,7 +11,7 @@ let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:msgDelimiter = '&&'
 let g:nodeinspect_window_pos = get(g:, 'nodeinspect_window_pos', "bottom")
-let g:nodeinspect_auto_watch = get(g:, 'nodeinspect_auto_watch', 0)
+let g:nodeinspect_auto_watch = get(g:, 'nodeinspect_auto_watch', 1)
 
 highlight default NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
 highlight default NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan

@@ -140,11 +140,8 @@ Remove a watch by deleting it from the watch window.
 
 ### Auto watches
 
-Auto watches will add the variables near the breakpoint location into the watch window (and remove them when of no use). It is done using syntactic analysis using Esprima (http://esprima.org/). It is currently experimental and requires setting the following which defaults to 0:
+The variables in the current scope will be automatically displayed in the watches window prefixed by an 'A'. This behavior can be disabled by setting g:nodeinspect_auto_watch to 0 (1 is default).
 
-```
-let g:nodeinspect_auto_watch = 1
-```
 
 ## Connecting to a running container
 
