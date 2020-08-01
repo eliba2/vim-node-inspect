@@ -10,8 +10,10 @@ let s:session = {}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:msgDelimiter = '&&'
+" configurable settings
 let g:nodeinspect_window_pos = get(g:, 'nodeinspect_window_pos', "bottom")
 let g:nodeinspect_auto_watch = get(g:, 'nodeinspect_auto_watch', 1)
+let g:nodeinspect_start_repl = get(g:, 'nodeinspect_start_repl', 1)
 
 highlight default NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
 highlight default NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan
@@ -387,6 +389,10 @@ function! OnNodeMessage(channel, msgs)
 				call nodeinspect#NodeInspectStepInto()
 			elseif mes["m"] == "nd_repl_stepout"
 				call nodeinspect#NodeInspectStepOut()
+			" if the repl was started node-inspect, go to repl mode there (js
+			" command mode)
+			elseif mes["m"] == "nd_repl_started"
+				call nodeinspect#utils#StartRepl()
 			else
 				echo "vim-node-inspect: unknown message ".mes["m"]
 			endif
@@ -554,7 +560,7 @@ function! s:NodeInspectStart()
 			echom 'cant connect to node-bridge'
 			return
 		endif
-		" send a connected message, when connecting to a remote instance
+		" send a connected message when connecting to a remote instance 
 		" (node-inspect doesn't display anything in this case)
 		if s:session["request"] == "attach"
 			sleep 100m

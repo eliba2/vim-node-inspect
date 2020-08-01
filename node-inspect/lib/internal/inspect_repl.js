@@ -738,7 +738,7 @@ function createRepl(inspector, nvim_bridge_p) {
 
 		repl.setPrompt('> ');
 
-		print('Press Ctrl + C to leave debug repl');
+		print('Ctrl + C will go to command mode');
 		repl.displayPrompt();
 	}
 
@@ -1266,7 +1266,6 @@ function createRepl(inspector, nvim_bridge_p) {
 		switch (message.m) {
 			case 'nd_init':
 				// init message. set state
-
 				if (message.autoWatches == 0) {
 					doAutoWatches = 0;
 				}
@@ -1367,6 +1366,9 @@ function createRepl(inspector, nvim_bridge_p) {
 					watches,
 				};
 				nvim_bridge.send(m);
+				break;
+			case 'nd_repl_set_execmode':
+				startCliRepl();
 				break;
 			default:
 				console.error("unknown message from vim",JSON.stringify(message));

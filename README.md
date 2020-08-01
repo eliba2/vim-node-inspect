@@ -166,6 +166,12 @@ The debugger windows appear on the bottom by default. Change it by using
 let g:nodeinspect_window_pos = 'right'|'left'|'bottom'
 ```
 
+The command window starts in repl mode by default. It gives you a javascript shell corresponding to the current scope. If you are familiar with node-inspect and/or want to use the command mode - which enables executing debugging commands manually - use the following setting:
+
+```
+let g:nodeinspect_start_repl = 0
+```
+
 
 ## Remarks
 In beta. Means its useful; things may change or fail.

@@ -196,6 +196,8 @@ class NodeInspector {
           process.exit(0);
         });
         this.paused = false;
+				let m = { m: 'nd_repl_started' };
+				this.nvim_bridge.send(m);
       })
       .then(null, (error) => process.nextTick(() => { throw error; }));
   }

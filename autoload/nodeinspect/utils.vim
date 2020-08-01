@@ -52,3 +52,11 @@ function nodeinspect#utils#CloseChannel()
 	endif	
 endfunction
 
+
+function nodeinspect#utils#StartRepl()
+	if g:nodeinspect_start_repl == 1
+		call nodeinspect#utils#SendEvent('{"m": "nd_repl_set_execmode"}')
+		sleep 50m
+	endif
+endfunction
+
