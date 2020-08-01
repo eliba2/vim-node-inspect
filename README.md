@@ -68,6 +68,14 @@ A sample configuration for attach would be:
 ```
 
 
+### Exiting ###
+
+**NodeInspectStop** will stop debugging and close the debugging windows. It will kill the node session in the case it was launched. Exiting (n)vim will also kill the node session if such was launched.
+
+Pressing Crtl+D or CTRL+C twice in the command window has a similar effect. 
+
+
+
 ### Automatically restarting the debug session ###
 
 When using an application to monitor changes and restart the node session (such as nodemon or pm2) it is useful to restart the debug session as well. This can be done with the restart parameter, relevant only to an attach request:

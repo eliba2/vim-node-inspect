@@ -62,9 +62,11 @@ NodeInspectConnect host:port - Connect to a running instance in host:port or to 
 
 *Note* node must be started with --inspect when connecting to a running instance. See https://nodejs.org/en/docs/guides/debugging-getting-started/ .
 
-To stop debugging use NodeInspectStop. It will kill the node instance in case or running a script and drop the connection in case of connecting to a running script. To list is as the others,
+To stop debugging use NodeInspectStop. It will kill the node instance in case or running a script and drop the connection in case of connecting to a running script. Exiting (n)vim will automatically run this command. To list is as the others,
 
 NodeInspectStop - Stop debugging (and kill the node instance)
+
+Pressing Crtl+D or CTRL+C twice in the command window has a similar effect. 
 
 It is possible to toggle the debugging window. As the name suggests,
 
@@ -199,9 +201,7 @@ let g:nodeinspect_window_pos = 'right'|'left'|'bottom'.
 
 The command window starts in repl mode by default. It gives you a javascript shell corresponding to the current scope. If you are familiar with node-inspect and/or want to use the command mode - which enables executing debugging commands manually - use the following setting:
 
-```
 let g:nodeinspect_start_repl = 0
-```
 
 
 ====================================================================
