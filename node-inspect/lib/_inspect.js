@@ -222,10 +222,12 @@ class NodeInspector {
 
   killChild() {
     this.client.reset();
-    if (this.child) {
-      this.child.kill();
-      this.child = null;
-    }
+		if (this.child) {
+			this.child.stderr.on('end', () => {
+				this.child.kill();
+				this.child = null;
+			});
+		}
   }
 
 	// in the case of restart the parameters might change, such in the case of a user started the script with arg "x" and subsequent exec started it with "y". in such case the the runScript must be rebinded as bind parameters can't be changed (or the whole session needs to re-start).
