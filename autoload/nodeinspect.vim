@@ -684,6 +684,7 @@ function! nodeinspect#NodeInspectRun(...)
 		let s:session["script"] = expand('%:p')
 		let s:session["initialLaunchBreak"] = 1
 		let s:session["args"] = a:000[:]
+		let s:session["configName"] = ''
     call s:NodeInspectStart()
 	else
 		call s:NodeInspectRun()
@@ -711,6 +712,7 @@ function! nodeinspect#NodeInspectStart(...)
 		let s:session["script"] = expand('%:p')
 		let s:session["initialLaunchBreak"] = 1
 		let s:session["args"] = a:000[:]
+		let s:session["configName"] = ''
 		call s:NodeInspectStart()
 	endif
 endfunction

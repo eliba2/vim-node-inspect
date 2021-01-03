@@ -184,7 +184,7 @@ class NodeInspector {
     const startRepl = createRepl(this,nvim_bridge);
 
     // Handle all possible exits
-    process.on('exit', () => this.killChild());
+    process.on('exit', () => this._killChild());
     process.once('SIGTERM', process.exit.bind(process, 0));
     process.once('SIGHUP', process.exit.bind(process, 0));
 
@@ -220,15 +220,47 @@ class NodeInspector {
     }).then(null, (error) => process.nextTick(() => { throw error; }));
   }
 
-  killChild() {
-    this.client.reset();
+
+	/* non promise version of killChild */
+	_killChild() {
+		this.client.reset();
 		if (this.child) {
-			this.child.stderr.on('end', () => {
-				this.child.kill();
-				this.child = null;
-			});
+			this.child.kill();
+			this.child = null;
 		}
-  }
+	}
+	
+
+	async killChild() {
+		return new Promise((resolve, reject) => {
+			try {
+				this.client.reset();
+				if (this.child) {
+
+					this.child.stderr.on('end', () => {
+						if (this.child) {
+							this.child.kill();
+							this.child = null;
+						}
+						resolve();
+					});
+				}
+				let that = this;
+				setTimeout(() => {
+					if (that.child) {
+						if (that.child) {
+							that.child.kill();
+							that.child = null;
+						}
+					}
+					resolve();
+				},0);
+			} catch(e) {
+				console.error(e.message);
+				reject();
+			}
+		});
+	}
 
 	// in the case of restart the parameters might change, such in the case of a user started the script with arg "x" and subsequent exec started it with "y". in such case the the runScript must be rebinded as bind parameters can't be changed (or the whole session needs to re-start).
 	rerun(script, scriptArgs) {
@@ -251,39 +283,39 @@ class NodeInspector {
 		this.run();
 	}
 
-  run() {
-    this.killChild();
+	run() {
+		this._killChild();
 
+		return this._runScript().then(([child, port, host]) => {
+			this.child = child;
 
-    return this._runScript().then(([child, port, host]) => {
-      this.child = child;
+			let connectionAttempts = 0;
+			const attemptConnect = () => {
+				++connectionAttempts;
+				debuglog('connection attempt #%d', connectionAttempts);
+				this.stdout.write('.');
+				return this.client.connect(port, host)
+					.then(() => {
+						debuglog('connection established');
+						this.stdout.write(' ok');
+					}, (error) => {
+						debuglog('connect failed', error);
+						// If it's failed to connect 10 times then print failed message
+						if (connectionAttempts >= 10) {
+							this.stdout.write(' failed to connect, please retry\n');
+							process.exit(1);
+						}
 
-      let connectionAttempts = 0;
-      const attemptConnect = () => {
-        ++connectionAttempts;
-        debuglog('connection attempt #%d', connectionAttempts);
-        this.stdout.write('.');
-        return this.client.connect(port, host)
-          .then(() => {
-            debuglog('connection established');
-            this.stdout.write(' ok');
-          }, (error) => {
-            debuglog('connect failed', error);
-            // If it's failed to connect 10 times then print failed message
-            if (connectionAttempts >= 10) {
-              this.stdout.write(' failed to connect, please retry\n');
-              process.exit(1);
-            }
+						return new Promise((resolve) => setTimeout(resolve, 500))
+							.then(attemptConnect);
+					});
+			};
 
-            return new Promise((resolve) => setTimeout(resolve, 500))
-              .then(attemptConnect);
-          });
-      };
+			this.print(`connecting to ${host}:${port} ..`, true);
+			return attemptConnect();
+		});
 
-      this.print(`connecting to ${host}:${port} ..`, true);
-      return attemptConnect();
-    });
-  }
+	}
 
   clearLine() {
     if (this.stdout.isTTY) {
@@ -319,9 +351,10 @@ class NodeInspector {
       this.repl.displayPrompt(true);
     }
     if (/Waiting for the debugger to disconnect\.\.\.\n$/.test(text)) {
-      this.killChild();
-			let m = { m: 'nd_halt' };
-			this.nvim_bridge.send(m);
+      this.killChild().then(() => {
+				let m = { m: 'nd_halt' };
+				this.nvim_bridge.send(m);
+			});
     }
   }
 }

@@ -73,11 +73,39 @@ function! nodeinspect#config#LoadConfigFile(session)
 			let fullFile = fullFile . line
 		endfor
 		" loaded the entire file, parse it to object
+		" configPtr holds the used configuration
 		let configObj = json_decode(fullFile)
-		if type(configObj) == 4 
-			if has_key(configObj,"localRoot") == 1 && has_key(configObj,"remoteRoot") == 1
-				let configuration["localRoot"] = s:ReplaceMacros(configObj["localRoot"])
-				let configuration["remoteRoot"] = configObj["remoteRoot"]
+		let configPtr = v:null
+		if type(configObj) == v:t_dict 
+			" test wherever its a multi configuration
+			if has_key(a:session, "configName") == 1 || has_key(configObj,"configurations") == 1
+				" validation, the first arg must be present and be the config name
+				if len(a:session["args"]) < 1
+					echom "Config name must be specified (only it). Use 'args' for paramters"
+					return 1
+				endif
+				" set the config name. other args are irrelevant - should be set from
+				" the arg configuration
+				let a:session["configName"] = a:session["args"][0]
+				if has_key(configObj,"configurations") == 1 && type(configObj["configurations"]) == v:t_list
+					" loop over configurations, get the relevant one
+					for configItem in configObj["configurations"]
+						if type(configItem) == v:t_dict && has_key(configItem, "name") && configItem["name"] == a:session["configName"]
+							let configPtr = configItem
+							break
+						endif
+					endfor
+				endif
+				if type(configPtr) != v:t_dict	
+					echom "vim-node-inspect - can't find configuration error"
+					return 1
+				endif
+			else
+				let configPtr = configObj
+			endif
+			if has_key(configPtr,"localRoot") == 1 && has_key(configPtr,"remoteRoot") == 1
+				let configuration["localRoot"] = s:ReplaceMacros(configPtr["localRoot"])
+				let configuration["remoteRoot"] = configPtr["remoteRoot"]
 				" add trailing backslash if not present. it will normalize both inputs
 				" in case the user add one with and one without
 				if configuration["localRoot"][-1:-1] != '/' 
@@ -87,56 +115,56 @@ function! nodeinspect#config#LoadConfigFile(session)
 					let configuration["remoteRoot"] = configuration["remoteRoot"] . '/'
 				endif
 			endif
-			if has_key(configObj,"request") == 1
-				if configObj["request"] == 'attach' || configObj["request"] == 'launch'
-					let configuration["request"] = configObj["request"]
+			if has_key(configPtr,"request") == 1
+				if configPtr["request"] == 'attach' || configPtr["request"] == 'launch'
+					let configuration["request"] = configPtr["request"]
 				else
 					echom "error reading launch in vim-node-inspect"
 					return 1
 				endif
 			endif
-			if has_key(configObj,"program") == 1
-				if type(configObj["program"]) == 1
-					let configuration["program"] = s:ReplaceMacros(configObj["program"])
+			if has_key(configPtr,"program") == 1
+				if type(configPtr["program"]) == 1
+					let configuration["program"] = s:ReplaceMacros(configPtr["program"])
 				else
 					echom "error reading program in vim-node-inspect"
 					return 1
 				endif
 			endif
-			if has_key(configObj,"address") == 1
-				if type(configObj["address"]) == 1
-					let configuration["address"] = configObj["address"]
+			if has_key(configPtr,"address") == 1
+				if type(configPtr["address"]) == 1
+					let configuration["address"] = configPtr["address"]
 				else
 					echom "error reading address in vim-node-inspect"
 					return 1
 				endif
 			endif
-			if has_key(configObj,"port") == 1
-				if type(configObj["port"]) == 0
-					let configuration["port"] = configObj["port"]
+			if has_key(configPtr,"port") == 1
+				if type(configPtr["port"]) == 0
+					let configuration["port"] = configPtr["port"]
 				else
 					echom "error reading port in vim-node-inspect"
 					return 1
 				endif
 			endif
-			if has_key(configObj,"restart") == 1
-				if configObj["restart"] == v:true || configObj["restart"] == 1
+			if has_key(configPtr,"restart") == 1
+				if configPtr["restart"] == v:true || configPtr["restart"] == 1
 					let a:session["restart"] = 1
 				else
 					let a:session["restart"] = 0
 				endif
 			endif
-			if has_key(configObj,"cwd") == 1
-				if type(configObj["cwd"]) == 1
-					let a:session["cwd"] = s:ReplaceMacros(configObj["cwd"])
+			if has_key(configPtr,"cwd") == 1
+				if type(configPtr["cwd"]) == 1
+					let a:session["cwd"] = s:ReplaceMacros(configPtr["cwd"])
 				else
 					echom "error reading cwd in vim-node-inspect"
 					return 1
 				endif
 			endif
-			if has_key(configObj,"envFile") == 1
-				if type(configObj["envFile"]) == 1
-					let envFile = s:ReplaceMacros(configObj["envFile"])
+			if has_key(configPtr,"envFile") == 1
+				if type(configPtr["envFile"]) == 1
+					let envFile = s:ReplaceMacros(configPtr["envFile"])
 					if filereadable(expand(envFile))
 						let a:session["envFile"] = envFile
 					else
@@ -148,9 +176,9 @@ function! nodeinspect#config#LoadConfigFile(session)
 					return 1
 				endif
 			endif
-			if has_key(configObj,"env") == 1
-				if type(configObj["env"]) == 4
-					let a:session["env"] = json_encode(configObj["env"])
+			if has_key(configPtr,"env") == 1
+				if type(configPtr["env"]) == 4
+					let a:session["env"] = json_encode(configPtr["env"])
 				else
 					echom "error reading envs in vim-node-inspect"
 					return 1
@@ -198,8 +226,8 @@ function! nodeinspect#config#LoadConfigFile(session)
 			endif
 			" read each line of args in order to alter the value
 			let a:session["args"] = []
-			if has_key(configObj,"args") == 1
-				for singleArg in configObj["args"]
+			if has_key(configPtr,"args") == 1
+				for singleArg in configPtr["args"]
 					call add(a:session["args"] ,s:ReplaceMacros(singleArg))
 				endfor
 			endif

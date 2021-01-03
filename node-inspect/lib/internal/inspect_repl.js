@@ -1314,8 +1314,9 @@ function createRepl(inspector, nvim_bridge_p) {
         Debugger.pause();
 				break;
 			case 'nd_kill':
-				inspector.killChild();
-				process.exit(0)
+        inspector.killChild().then(() => {
+					process.exit(0)
+				});
 				break;
 			case 'nd_continue':
 				if (isRunning) {
