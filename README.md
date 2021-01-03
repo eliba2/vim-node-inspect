@@ -96,7 +96,7 @@ It is possible to have several config files in case the workspace has several pr
 
 ### Multiple configurations
 
-Multiple configurations can be defined by setting a **"configurations"** object which lists the possible configurations, each having a **"name"** key which uniquly identifies it. **"NodeInspectStart"** must be used followed by at least one parameter which is the configuration name. Other starting parameters might follow.
+Multiple configurations can be defined by setting a **"configurations"** object which lists the possible configurations, each having a **"name"** key which uniquly identifies it. **"NodeInspectStart"** or **"NodeInspectRun"** must be used followed by at least one parameter which is the configuration name. Other starting parameters might follow.
 
 
 A sample configuration would be:
@@ -125,9 +125,9 @@ Usage in this case would be either *NodeInspectStart "run"* or *NodeInspectStart
 
 The following commands are available:
 
-**NodeInspectStart [args]** - Starts debugger, paused
+**NodeInspectStart [config name] [args]** - Starts debugger, paused
 
-**NodeInspectRun [args]** - Continue / Start and run immediatly
+**NodeInspectRun [config name] [args]** - Continue / Start and run immediatly
 
 **NodeInspectConnect host:port** - Connect to a running instance
 
