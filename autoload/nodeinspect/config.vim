@@ -17,6 +17,9 @@ function! nodeinspect#config#SetConfigurationDefaults(session)
 	let a:session["cwd"] = getcwd()
 	let a:session["envFile"] = ""
 	let a:session["env"] = ""
+    let a:session["runtimeExecutable"] = ""
+    let a:session["runtimeArgs"] = []
+    let a:session["exJob"] = -1
 endfunction
 
 
@@ -162,11 +165,11 @@ function! nodeinspect#config#LoadConfigFile(session)
 					return 1
 				endif
 			endif
-			if has_key(configPtr,"envFile") == 1
-				if type(configPtr["envFile"]) == 1
-					let envFile = s:ReplaceMacros(configPtr["envFile"])
-					if filereadable(expand(envFile))
-						let a:session["envFile"] = envFile
+			if has_key(configPtr,"envfile") == 1
+				if type(configPtr["envfile"]) == 1
+					let envfile = s:replacemacros(configPtr["envfile"])
+					if filereadable(expand(envfile))
+						let a:session["envfile"] = envfile
 					else
 						echom "error reading envfile in vim-node-inspect"
 						return 1
@@ -184,6 +187,25 @@ function! nodeinspect#config#LoadConfigFile(session)
 					return 1
 				endif
 			endif
+
+			if has_key(configPtr,"runtimeExecutable") == 1
+				if type(configPtr["runtimeExecutable"]) == 1
+					let a:session["runtimeExecutable"] = configPtr["runtimeExecutable"]
+				else
+					echom "error reading runtimeExecutable in vim-node-inspect"
+					return 1
+				endif
+			endif
+
+			if has_key(configPtr,"runtimeArgs") == 1
+                if type(configPtr["runtimeArgs"]) == 3
+                    let a:session["runtimeArgs"] = configPtr["runtimeArgs"]
+                else
+                    echom "error reading runtimeArgs in vim-node-inspect"
+                    return 1
+                endif
+			endif
+
 			" validate config and setup session
 			if has_key(configuration, "request") == 1 
 				if configuration["request"] == 'attach' 
@@ -206,8 +228,8 @@ function! nodeinspect#config#LoadConfigFile(session)
 						echom "vim-node-inspect config error, restart in invalid in launch mode"
 						return 1
 					endif
-					if has_key(configuration, "program") == 0
-						echom "vim-node-inspect config error, launch without a program"
+					if has_key(configuration, "program") == 0 && has_key(configuration, "runtimeExecutable") == 0
+						echom "vim-node-inspect config error, launch without a program or runtimeExecutable"
 						return 1
 					else
 						let a:session["request"] = configuration["request"]

@@ -26,7 +26,6 @@ const Repl = require('repl');
 const util = require('util');
 const vm = require('vm');
 const fileURLToPath = require('url').fileURLToPath;
-const tokenizer = require('../../ext/tokenize');
 const debuglog = util.debuglog('inspect');
 var doAutoWatches = 1;
 

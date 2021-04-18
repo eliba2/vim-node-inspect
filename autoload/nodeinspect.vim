@@ -330,6 +330,13 @@ function! s:onDebuggerHalted()
 endfunction
 
 
+" called when the debug session ended from external job (exec via npm for
+" example)
+function! nodeinspect#onDebuggerEnded()
+    call s:onDebuggerHalted()
+endfunction
+
+
 " on receiving a message from the node bridge.
 " multiple messages might arrive at one call hence the splitting.
 function! OnNodeMessage(channel, msgs)
@@ -577,6 +584,13 @@ function! s:NodeInspectStart()
 		endif
 		" set the status to running, might be at ended(2)
 		let s:status = 3
+        " restarting might need to restart external jobs, if any
+		let repl_result = nodeinspect#repl#StartExternalJobs(s:session)
+		if repl_result != 0
+			call nodeinspect#backtrace#ClearBacktraceWindow('node-inspect restart error')
+			call win_gotoid(s:start_win)
+			return
+		endif
 		" remove all breakpoint, they will be resolved by node-inspect
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()

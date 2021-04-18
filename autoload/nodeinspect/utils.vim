@@ -9,6 +9,7 @@ function! nodeinspect#utils#SendEvent(e)
 		endif
 	elseif type(s:channel) == 9 && ch_status(s:channel) == "open"
 		call ch_sendraw(s:channel, a:e)
+        sleep 5m
 	endif
 endfunction
 
