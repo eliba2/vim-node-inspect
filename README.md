@@ -52,7 +52,7 @@ Use absolute paths. "${workspaceFolder}" can be used, it equals to the current w
 
 **"port"** - in the case of "attach", this is the port to connect to. Must be present.
 
-**"cmd"** - working directory for running the script. Defaults to (n)vims current directory. Optional.
+**"cwd"** - working directory for running the script. Defaults to (n)vims current directory. Optional.
 
 **"envFile"** - path to a file containing environment variables. Optional.
 
