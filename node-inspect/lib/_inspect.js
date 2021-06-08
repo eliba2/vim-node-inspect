@@ -410,21 +410,23 @@ async function startInspect(argv = process.argv.slice(2),
   stdin = process.stdin,
   stdout = process.stdout) {
   /* eslint-disable no-console */
-  if (argv.length < 1) {
+  if (argv.length < 2) {
     const invokedAs = runAsStandalone ?
       'node-inspect' :
       `${process.argv0} ${process.argv[1]}`;
 
-    console.error(`Usage: ${invokedAs} script.js`);
-    console.error(`       ${invokedAs} <host>:<port>`);
-    console.error(`       ${invokedAs} -p <pid>`);
+    console.error(`This is vim-node-inspect fork`);
+    console.error(`Usage: <port> ${invokedAs} script.js`);
+    console.error(`       <port> ${invokedAs} <host>:<port>`);
+    console.error(`       <port> ${invokedAs} -p <pid>`);
     process.exit(1);
   }
 
+  const port = argv[0];
 	const nvim_bridge = new NvimBridge();
-	await nvim_bridge.createServer();
+	await nvim_bridge.createServer(port);
 
-  const options = parseArgv(argv);
+  const options = parseArgv(argv.slice(1)); // remove the port parameter
   const inspector = new NodeInspector(options, stdin, stdout, nvim_bridge);
 
   stdin.resume();

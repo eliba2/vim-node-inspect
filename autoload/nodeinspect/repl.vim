@@ -112,10 +112,19 @@ function nodeinspect#repl#StartNodeInspect(session, plugin_path)
 		echom "nodeinspect - can't start repl"
 		return
 	endif
+    " find an open port
+	let cmd_line = []
+	call add(cmd_line, 'node')
+	call add(cmd_line, a:plugin_path . "/node-inspect/find_port.js")
+    let a:session['bridge_port'] = system(cmd_line)
+    if v:shell_error == -1
+        return 1
+    endif
 	" prepare call command line
 	let cmd_line = []
 	call add(cmd_line, 'node')
 	call add(cmd_line, a:plugin_path . "/node-inspect/cli.js")
+	call add(cmd_line, a:session['bridge_port'])
 	" start according to settings
 	if a:session["request"] == "launch"
         " add the relevant launch params

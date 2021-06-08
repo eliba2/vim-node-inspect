@@ -22,13 +22,13 @@ function! nodeinspect#utils#ConnectToBridge(session)
 	while retries >= 0
 		sleep 200m
 		if has("nvim")
-			let s:channel = sockconnect("tcp", "localhost:9514", {"on_data": "OnNodeNvimMessage"})
+			let s:channel = sockconnect("tcp", "localhost:".a:session["bridge_port"], {"on_data": "OnNodeNvimMessage"})
 			if s:channel > 0
 				let connected = 1
 				break
 			endif
 		else
-			let s:channel = ch_open("localhost:9514", {"mode":"raw", "callback": "OnNodeMessage"})
+			let s:channel = ch_open("localhost:".a:session["bridge_port"], {"mode":"raw", "callback": "OnNodeMessage"})
 			if ch_status(s:channel) == "open"
 				let connected = 1
 				break

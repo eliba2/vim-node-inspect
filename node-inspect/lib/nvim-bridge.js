@@ -1,7 +1,6 @@
 const socket_path = '/tmp/node-inspect.sock';
 const net = require('net');
 var EventEmitter = require('events').EventEmitter;
-const PORT = 9514;
 const MSG_DELIMITER = '&&';
 
 
@@ -48,7 +47,8 @@ class NvimBridge {
 	}
 
 
-	createServer() {
+  // the port is determined in vim and is considered safe at this point
+	createServer(port) {
 		return new Promise((resolve,reject) => {
 			this.server = net.createServer((client) => {
 				this.client = client;
@@ -70,7 +70,7 @@ class NvimBridge {
 					}
 				});
 			});
-			this.server.listen(PORT, (c) => {
+			this.server.listen(port, (c) => {
 			});
 		});
 	}
