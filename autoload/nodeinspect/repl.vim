@@ -116,7 +116,11 @@ function nodeinspect#repl#StartNodeInspect(session, plugin_path)
 	let cmd_line = []
 	call add(cmd_line, 'node')
 	call add(cmd_line, a:plugin_path . "/node-inspect/find_port.js")
-    let a:session['bridge_port'] = system(cmd_line)
+	if has("nvim")
+        let a:session['bridge_port'] = system(cmd_line)
+    else
+        let a:session['bridge_port'] = system(join(cmd_line, ' '))
+    endif
     if v:shell_error == -1
         return 1
     endif
