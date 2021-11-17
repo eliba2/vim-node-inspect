@@ -1,3 +1,4 @@
+" vim: noet
 let s:inspect_win = -1
 let s:inspect_buf = -1
 let s:watches = {}
@@ -46,7 +47,7 @@ function s:RecalcWatchesKeys()
 			let line = trim(getline(currentLine))
 			" don't recalc autos
 			if len(line) != 0 && line[:(len(s:auto_sign)-1)] != s:auto_sign
-				let firstWord = split(line)[0]	
+				let firstWord = split(line)[0]
 				let s:watches[firstWord] = "n/a"
 			endif
 			let currentLine += 1

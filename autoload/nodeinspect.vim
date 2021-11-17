@@ -1,3 +1,4 @@
+" vim: noet
 let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
@@ -6,7 +7,7 @@ let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
-let s:session = {}
+let s:session = {"watches": {}}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:msgDelimiter = '&&'
@@ -128,7 +129,7 @@ function! s:getRemoteFilePath(file)
 		return a:file
 	endif
 	" strip file of its path, add it to the remote
-	let remoteFile = substitute(a:file,	s:session["localRoot"], s:session["remoteRoot"], "")
+	let remoteFile = substitute(a:file, s:session["localRoot"], s:session["remoteRoot"], "")
 	return remoteFile
 endfunction
 
@@ -333,7 +334,7 @@ endfunction
 " called when the debug session ended from external job (exec via npm for
 " example)
 function! nodeinspect#onDebuggerEnded()
-    call s:onDebuggerHalted()
+	call s:onDebuggerHalted()
 endfunction
 
 
@@ -527,7 +528,7 @@ endfunction
 
 " starts node-inspect. connects to the node bridge.
 function! s:NodeInspectStart()
-	" set configuration defaults 	
+	" set configuration defaults
 	call  nodeinspect#config#SetConfigurationDefaults(s:session)
 	" load configuration. if execution is specified there it shall be used.  
 	" clear configuration in here as it can't be done when passing a variable
@@ -584,7 +585,7 @@ function! s:NodeInspectStart()
 		endif
 		" set the status to running, might be at ended(2)
 		let s:status = 3
-        " restarting might need to restart external jobs, if any
+		" restarting might need to restart external jobs, if any
 		let repl_result = nodeinspect#repl#StartExternalJobs(s:session)
 		if repl_result != 0
 			call nodeinspect#backtrace#ClearBacktraceWindow('node-inspect restart error')
@@ -613,10 +614,7 @@ function! s:NodeInspectStart()
 		endif
 	endif
 	" redraw the watch window; draws any watches added from the session
-	for watch in keys(s:session["watches"])
-		call nodeinspect#watches#AddBulk(s:session["watches"])
-	endfor
-
+	call nodeinspect#watches#AddBulk(s:session["watches"])
 endfunction
 
 
@@ -698,7 +696,7 @@ function! nodeinspect#NodeInspectRun(...)
 		let s:session["script"] = expand('%:p')
 		let s:session["initialLaunchBreak"] = 1
 		let s:session["args"] = a:000[:]
-    call s:NodeInspectStart()
+		call s:NodeInspectStart()
 	else
 		call s:NodeInspectRun()
 	endif
