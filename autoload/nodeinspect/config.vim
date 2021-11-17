@@ -1,4 +1,5 @@
-let s:configFileName = 'vim-node-config.json' 
+" vim: noet
+let s:configFileName = 'vim-node-config.json'
 
 function! s:removeSessionKeys(session,...)
 	for uvar in a:000
@@ -17,9 +18,9 @@ function! nodeinspect#config#SetConfigurationDefaults(session)
 	let a:session["cwd"] = getcwd()
 	let a:session["envFile"] = ""
 	let a:session["env"] = ""
-    let a:session["runtimeExecutable"] = ""
-    let a:session["runtimeArgs"] = []
-    let a:session["exJob"] = -1
+	let a:session["runtimeExecutable"] = ""
+	let a:session["runtimeArgs"] = []
+	let a:session["exJob"] = -1
 endfunction
 
 
@@ -42,7 +43,7 @@ function s:GetConfigFilePath()
 	if filereadable(configFilePath)
 		return configFilePath
 	endif
-	" if the file is not found in pwd and the script is a decedant, try going up  
+	" if the file is not found in pwd and the script is a decedant, try going up
 	let expandString = '%:p:h'
 	let traverseDir = expand(expandString)
 	while stridx(traverseDir, getcwd()) != -1
@@ -79,7 +80,7 @@ function! nodeinspect#config#LoadConfigFile(session)
 		" configPtr holds the used configuration
 		let configObj = json_decode(fullFile)
 		let configPtr = v:null
-		if type(configObj) == v:t_dict 
+		if type(configObj) == v:t_dict
 			" test wherever its a multi configuration
 			if has_key(a:session, "configName") == 1 || has_key(configObj,"configurations") == 1
 				" validation, the first arg must be present and be the config name
@@ -99,7 +100,7 @@ function! nodeinspect#config#LoadConfigFile(session)
 						endif
 					endfor
 				endif
-				if type(configPtr) != v:t_dict	
+				if type(configPtr) != v:t_dict
 					echom "vim-node-inspect - can't find configuration error"
 					return 1
 				endif
@@ -111,10 +112,10 @@ function! nodeinspect#config#LoadConfigFile(session)
 				let configuration["remoteRoot"] = configPtr["remoteRoot"]
 				" add trailing backslash if not present. it will normalize both inputs
 				" in case the user add one with and one without
-				if configuration["localRoot"][-1:-1] != '/' 
+				if configuration["localRoot"][-1:-1] != '/'
 					let configuration["localRoot"] = configuration["localRoot"] . '/'
 				endif
-				if configuration["remoteRoot"][-1:-1] != '/' 
+				if configuration["remoteRoot"][-1:-1] != '/'
 					let configuration["remoteRoot"] = configuration["remoteRoot"] . '/'
 				endif
 			endif
@@ -198,17 +199,17 @@ function! nodeinspect#config#LoadConfigFile(session)
 			endif
 
 			if has_key(configPtr,"runtimeArgs") == 1
-                if type(configPtr["runtimeArgs"]) == 3
-                    let a:session["runtimeArgs"] = configPtr["runtimeArgs"]
-                else
-                    echom "error reading runtimeArgs in vim-node-inspect"
-                    return 1
-                endif
+				if type(configPtr["runtimeArgs"]) == 3
+					let a:session["runtimeArgs"] = configPtr["runtimeArgs"]
+				else
+					echom "error reading runtimeArgs in vim-node-inspect"
+					return 1
+				endif
 			endif
 
 			" validate config and setup session
-			if has_key(configuration, "request") == 1 
-				if configuration["request"] == 'attach' 
+			if has_key(configuration, "request") == 1
+				if configuration["request"] == 'attach'
 					if has_key(configuration, "port") == 0
 						echom "vim-node-inspect config error, attach without a port"
 						return 1
@@ -223,7 +224,7 @@ function! nodeinspect#config#LoadConfigFile(session)
 						endif
 					endif
 				endif
-				if configuration["request"] == 'launch' 
+				if configuration["request"] == 'launch'
 					if has_key(configuration, "restart") == 1
 						echom "vim-node-inspect config error, restart in invalid in launch mode"
 						return 1

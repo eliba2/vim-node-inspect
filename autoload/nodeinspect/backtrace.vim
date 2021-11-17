@@ -1,3 +1,4 @@
+" vim: noet
 let s:backtrace_win = -1
 let s:backtrace_buf = -1
 
@@ -65,14 +66,14 @@ function! nodeinspect#backtrace#ShowBacktraceWindow(startWin)
 			else
 				execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile statusline=Callstack"
 			endif
-			
+
 			let s:backtrace_buf = bufnr('%')
 			set nonu
 		else
 			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
 				execute winheight(a:startWin)/3."new | buffer ". s:backtrace_buf
 			else
-				execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:backtrace_buf 
+				execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:backtrace_buf
 			endif
 		endif
 		let s:backtrace_win = win_getid()
