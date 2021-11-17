@@ -6,7 +6,7 @@ let s:sign_group = 'visgroup'
 let s:sign_cur_exec = 'vis'
 let s:sign_brkpt = 'visbkpt'
 let s:breakpoints = {}
-let s:session = {}
+let s:session = {"watches": {}}
 let s:breakpointsUnhandledBuffers = {}
 let s:sessionFile = s:plugin_path . '/vim-node-session.json'
 let s:msgDelimiter = '&&'
@@ -613,10 +613,7 @@ function! s:NodeInspectStart()
 		endif
 	endif
 	" redraw the watch window; draws any watches added from the session
-	for watch in keys(s:session["watches"])
-		call nodeinspect#watches#AddBulk(s:session["watches"])
-	endfor
-
+	call nodeinspect#watches#AddBulk(s:session["watches"])
 endfunction
 
 
