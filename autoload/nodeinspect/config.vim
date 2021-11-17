@@ -34,20 +34,32 @@ function! s:ReplaceMacros(str)
 	return replaced
 endfunction
 
+function s:getReadableConfigFile(path)
+	let configFilePath = a:path . '/' . s:configFileName
+	if filereadable(configFilePath)
+		return configFilePath
+	endif
+	let legacyConfigFilePath = a:path . '/' . s:legacyConfigFileName
+	if filereadable(legacyConfigFilePath)
+		return legacyConfigFilePath
+	endif
+	return v:false
+endfunction
+
 " find the config file path. if its not in the currend working directory, try
 " going up from the current buffer directory. Returns the directory or empty
 " string if failed to find the config file.
 function s:GetConfigFilePath()
-	let configFilePath = getcwd() . '/' . s:configFileName
-	if filereadable(configFilePath)
+	let configFilePath = s:getReadableConfigFile(getcwd())
+	if configFilePath
 		return configFilePath
 	endif
 	" if the file is not found in pwd and the script is a decedant, try going up  
 	let expandString = '%:p:h'
 	let traverseDir = expand(expandString)
 	while stridx(traverseDir, getcwd()) != -1
-		let configFilePath = traverseDir . '/' . s:configFileName
-		if filereadable(configFilePath)
+		let configFilePath = s:getReadableConfigFile(traverseDir)
+		if configFilePath
 			return configFilePath
 		endif
 		let expandString = expandString . ':h'
