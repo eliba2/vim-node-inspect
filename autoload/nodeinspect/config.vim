@@ -1,4 +1,5 @@
-let s:configFileName = 'vim-node-config.json' 
+let s:configFileName = 'vim-node-inspect.json'
+let s:legacyConfigFileName = 'vim-node-config.json'
 
 function! s:removeSessionKeys(session,...)
 	for uvar in a:000
