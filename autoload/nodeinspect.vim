@@ -616,7 +616,6 @@ function! s:NodeInspectStart()
 	for watch in keys(s:session["watches"])
 		call nodeinspect#watches#AddBulk(s:session["watches"])
 	endfor
-
 endfunction
 
 

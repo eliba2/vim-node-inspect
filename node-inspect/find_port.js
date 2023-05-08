@@ -23,4 +23,3 @@ async function findOpenPort() {
   process.stdout.write(`${port}`);
   process.exit(0);
 })();
-

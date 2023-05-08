@@ -2,6 +2,7 @@
 breakpoints
 vim-node-config.json
 vim-node-session.json
+node_modules
 
 # Sometimes I'm on Mac
 .DS_Store
