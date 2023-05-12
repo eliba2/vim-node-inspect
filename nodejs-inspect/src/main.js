@@ -1,1 +1,1 @@
-require('./vim-node-inspector').start()
+require('./vim-node-inspector').start();

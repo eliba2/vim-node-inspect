@@ -1,77 +1,81 @@
-const inspector = require('./inspector')
-let doAutoWatches = 0
+const inspector = require('./inspector');
+const child = require('./child');
+let doAutoWatches = 0;
 
 const handleVimEvents = async (message) => {
-  console.log('processing ', message.m)
+  console.log('processing ', message.m);
   switch (message.m) {
     case 'nd_init':
       // init message. set state
       if (message.autoWatches === 0) {
-        doAutoWatches = 0
+        doAutoWatches = 0;
       }
       // env file config will be overridden by specific env file configuration
       if (message.envFile) {
-        const config = require('../../dotenv').config({ path: message.envFile })
+        const config = require('../../dotenv').config({ path: message.envFile });
       }
       if (message.env) {
         try {
-          const envs = JSON.parse(message.env)
-          Object.keys(envs).map((s) => (process.env[s] = envs[s]))
+          const envs = JSON.parse(message.env);
+          Object.keys(envs).map((s) => (process.env[s] = envs[s]));
         } catch (e) {
-          console.log('error parsing env object', e)
+          console.log('error parsing env object', e);
         }
       }
-      break
+      break;
     case 'nd_next':
       if (inspector.isRunning) {
-        print('Only available when paused(1)')
-        return
+        print('Only available when paused(1)');
+        return;
       }
-      inspector.handleResumed()
-      inspector.client.Debugger.stepOver()
-      break
+      inspector.handleResumed();
+      inspector.client.Debugger.stepOver();
+      break;
     case 'nd_into':
       if (inspector.isRunning) {
-        print('Only available when paused(2)')
-        return
+        print('Only available when paused(2)');
+        return;
       }
-      inspector.handleResumed()
-      inspector.client.Debugger.stepInto()
-      break
+      inspector.handleResumed();
+      inspector.client.Debugger.stepInto();
+      break;
     case 'nd_out':
       if (inspector.isRunning) {
-        print('Only available when paused(3)')
-        return
+        print('Only available when paused(3)');
+        return;
       }
-      inspector.handleResumed()
-      inspector.client.Debugger.stepOut()
-      break
+      inspector.handleResumed();
+      inspector.client.Debugger.stepOut();
+      break;
     case 'nd_pause':
       if (!inspector.isRunning) {
-        print('Only available when running(4)')
-        return
+        print('Only available when running(4)');
+        return;
       }
-      inspector.client.Debugger.pause()
-      break
+      inspector.client.Debugger.pause();
+      break;
     case 'nd_kill':
-      inspector.stop()
-      // inspector.killChild().then(() => {
-      process.exit(0)
-      // })
-      break
+      child.kill();
+      await inspector.stop();
+      process.exit(0);
+      break;
     case 'nd_continue':
       if (inspector.isRunning) {
-        print('Only available when paused(5)')
-        return
+        print('Only available when paused(5)');
+        return;
       }
-      inspector.handleResumed()
-      inspector.client.Debugger.resume()
-      break
-      /*
+      inspector.handleResumed();
+      inspector.client.Debugger.resume();
+      break;
     case 'nd_restart':
       // make an js array out of args, argv-argc style
-      inspector.rerun(message.script, message.args)
-      break
+      child.rerun(message.script, message.args);
+      // using setTimeout to make sure the child starts
+      setTimeout(async () => {
+        await inspector.restart();
+      }, 100);
+      break;
+      /*
     case 'nd_print':
       print(message.txt)
       break
@@ -121,10 +125,10 @@ const handleVimEvents = async (message) => {
       break
 */
     default:
-      console.error('unknown message from vim', JSON.stringify(message))
+      console.error('unknown message from vim', JSON.stringify(message));
   }
-}
+};
 
 module.exports = {
   handleVimEvents
-}
+};
