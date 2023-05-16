@@ -147,10 +147,10 @@ function! nodeinspect#watches#ShowWatchWindow(startWin)
 	if s:inspect_buf == -1 || bufwinnr(s:inspect_buf) == -1
 		if s:inspect_buf == -1
 			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
-				execute winheight(a:startWin)/3."new | setlocal nobuflisted buftype=nofile noswapfile statusline=Watches"
+				execute winheight(a:startWin)/5*2."new | setlocal nobuflisted buftype=nofile noswapfile statusline=Watches"
 			else
 				" bottom/ dk
-				execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile noswapfile statusline=Watches"
+				execute "rightb ".winwidth(a:startWin)/5*2."vnew | setlocal nobuflisted buftype=nofile noswapfile statusline=Watches"
 			endif
 			let s:inspect_buf = bufnr('%')
 			set nonu
@@ -158,9 +158,9 @@ function! nodeinspect#watches#ShowWatchWindow(startWin)
 			autocmd BufLeave <buffer> noautocmd call OnTextModification()
 		else
 			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
-				execute winheight(a:startWin)/3."new | buffer ". s:inspect_buf
+				execute winheight(a:startWin)/5*2."new | buffer ". s:inspect_buf
 			else
-				execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:inspect_buf
+				execute "rightb ".winwidth(a:startWin)/5*2."vnew | buffer ". s:inspect_buf
 			endif
 		endif
 		let s:inspect_win = win_getid()

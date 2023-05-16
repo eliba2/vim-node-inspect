@@ -18,8 +18,12 @@ async function findOpenPort () {
   });
 }
 
-(async function () {
-  const port = await findOpenPort();
-  process.stdout.write(`${port}`);
-  process.exit(0);
-})();
+if (require.main === module) {
+  (async function () {
+    const port = await findOpenPort();
+    process.stdout.write(`${port}`);
+    process.exit(0);
+  })();
+}
+
+module.exports = findOpenPort;

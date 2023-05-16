@@ -21,7 +21,7 @@ class InspectChild {
     });
   }
 
-  init (target) {
+  init (target, port, args) {
     process.on('uncaughtException', (e) => {
       console.error('Cant start nodejs-inspect');
       console.error(e.message);
@@ -29,7 +29,7 @@ class InspectChild {
     });
 
     /* starting nodejs in case of launch */
-    this.child = spawn('node', ['--inspect-brk=9222', target]);
+    this.child = spawn('node', [`--inspect-brk=${port}`, target, ...args]);
 
     this.child.stdout.on('data', (data) => {
       console.log(`>> ${data}`);
@@ -58,7 +58,7 @@ class InspectChild {
   }
 
   rerun (script, scriptArgs) {
-    this.init(script);
+    this.init(script, scriptArgs);
   }
 }
 

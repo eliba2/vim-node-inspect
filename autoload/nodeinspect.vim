@@ -1,4 +1,4 @@
-let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting
+let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting (not used)
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
 let s:brkpt_sign_id = 3
@@ -582,8 +582,8 @@ function! s:NodeInspectStart()
 				let s:session["script"] = expand('%:p')
 			endif
 		endif
-		" set the status to running, might be at ended(2)
-		let s:status = 3
+		" set the status to started, might be at ended(2)
+		let s:status = 1
         " restarting might need to restart external jobs, if any
 		let repl_result = nodeinspect#repl#StartExternalJobs(s:session)
 		if repl_result != 0
@@ -592,6 +592,8 @@ function! s:NodeInspectStart()
 			return
 		endif
 		" remove all breakpoint, they will be resolved by node-inspect
+	echom "status is ".s:status
+		
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()
 		call nodeinspect#utils#SendEvent('{"m": "nd_restart", "script": "'. s:session["script"] . '","args": ' . json_encode(s:session["args"]) . '}')
@@ -654,7 +656,7 @@ endfunction
 
 function! nodeinspect#NodeInspectStepOver()
 	if s:status != 1
-		echo "node-inspect not started"
+		echo "node-inspect not started ".s:status
 		return
 	endif
 	call s:NodeInspectStepOver()

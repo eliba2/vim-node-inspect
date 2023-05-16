@@ -61,18 +61,18 @@ function! nodeinspect#backtrace#ShowBacktraceWindow(startWin)
 		" open split for call stack
 		if s:backtrace_buf == -1
 			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
-				execute winheight(a:startWin)/3."new | setlocal nobuflisted buftype=nofile statusline=Callstack"
+				execute winheight(a:startWin)/5*2."new | setlocal nobuflisted buftype=nofile statusline=Callstack"
 			else
-				execute "rightb ".winwidth(a:startWin)/3."vnew | setlocal nobuflisted buftype=nofile statusline=Callstack"
+				execute "rightb ".winwidth(a:startWin)/5*2."vnew | setlocal nobuflisted buftype=nofile statusline=Callstack"
 			endif
 			
 			let s:backtrace_buf = bufnr('%')
 			set nonu
 		else
 			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
-				execute winheight(a:startWin)/3."new | buffer ". s:backtrace_buf
+				execute winheight(a:startWin)/5*2."new | buffer ". s:backtrace_buf
 			else
-				execute "rightb ".winwidth(a:startWin)/3."vnew | buffer ". s:backtrace_buf 
+				execute "rightb ".winwidth(a:startWin)/5*2."vnew | buffer ". s:backtrace_buf 
 			endif
 		endif
 		let s:backtrace_win = win_getid()

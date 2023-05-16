@@ -127,7 +127,11 @@ function nodeinspect#repl#StartNodeInspect(session, plugin_path)
     " prepare call command line
     let cmd_line = []
     call add(cmd_line, 'node')
+    " target
     call add(cmd_line, a:plugin_path . "/nodejs-inspect/src/main.js")
+    " add request type
+    call add(cmd_line, a:session["request"])
+    " port
     call add(cmd_line, a:session['bridge_port'])
     " start according to settings
     if a:session["request"] == "launch"
@@ -182,11 +186,11 @@ function nodeinspect#repl#ShowReplWindow(startWin)
 				endif
 
 				if s:repl_buf == -1
-					execute "vert ".winwidth(a:startWin)/3."new"
+					execute "vert ".winwidth(a:startWin)/5*2."new"
 					let s:repl_buf = bufnr('%')
 					set nonu
 				else
-					execute "vert ".winwidth(a:startWin)/3."new | buffer" .s:repl_buf
+					execute "vert ".winwidth(a:startWin)/5*2."new | buffer" .s:repl_buf
 				endif
 
 				if rightSplitVal == 0
@@ -197,11 +201,11 @@ function nodeinspect#repl#ShowReplWindow(startWin)
 			else
 				" bottom/ dk
 				if s:repl_buf == -1
-					execute "bo ".winheight(a:startWin)/3."new"
+					execute "bo ".winheight(a:startWin)/5*2."new"
 					let s:repl_buf = bufnr('%')
 					set nonu
 				else
-					execute "bo ".winheight(a:startWin)/3."new | buffer " . s:repl_buf
+					execute "bo ".winheight(a:startWin)/5*2."new | buffer " . s:repl_buf
 				endif
 			endif
 		let s:repl_win = win_getid()

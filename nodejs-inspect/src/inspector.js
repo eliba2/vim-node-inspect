@@ -59,29 +59,37 @@ class Inspector {
     nvimBridge.send(m);
   }
 
-  start () {
-    console.log('========= start ');
-    CDP(async (ifClient) => {
-      this.client = ifClient;
-      const { Debugger, Runtime } = ifClient;
-      try {
-        Debugger.paused((props) => {
-          console.log('paused !');
-          this.onDebuggerPaused(props);
+  async start (target) {
+    const url = new URL(target.startsWith('http') ? target : `http://${target}`);
+    const { hostname, port } = url;
+    this.client = await CDP({ host: hostname, port: Number(port) });
+    const { Debugger, Runtime } = this.client;
+    try {
+      Debugger.paused((props) => {
+        console.log('paused !');
+        this.onDebuggerPaused(props);
         // client.Debugger.resume();
         // client.close();
-        });
-        Debugger.scriptParsed((props) => {
-          this.onScriptParsed(props);
-        });
-        await Runtime.runIfWaitingForDebugger();
-        await Debugger.enable();
-      } catch (err) {
-        console.error(err);
-      } finally {
+      });
+      Debugger.scriptParsed((props) => {
+        this.onScriptParsed(props);
+      });
+      await Runtime.runIfWaitingForDebugger();
+      await Debugger.enable();
+    } catch (err) {
+      console.error(err);
+    } finally {
       // client.close();
-      }
-    }).on('error', (err) => {
+    }
+    this.client.on('ready', () => {
+      const vimReadyMessage = { m: 'nd_node_socket_ready' };
+      nvimBridge.send(vimReadyMessage);
+    });
+    this.client.on('disconnect', () => {
+      const vimSockLostMessage = { m: 'nd_node_socket_closed' };
+      nvimBridge.send(vimSockLostMessage);
+    });
+    this.client.on('error', (err) => {
       console.error(err);
     });
   }

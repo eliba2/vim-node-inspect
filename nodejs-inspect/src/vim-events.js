@@ -68,7 +68,6 @@ const handleVimEvents = async (message) => {
       inspector.client.Debugger.resume();
       break;
     case 'nd_restart':
-      // make an js array out of args, argv-argc style
       child.rerun(message.script, message.args);
       // using setTimeout to make sure the child starts
       setTimeout(async () => {
