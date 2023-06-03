@@ -1,4 +1,11 @@
 const url = require('url');
+const util = require('util');
+
+const print = (value) => {
+  const INSPECT_OPTIONS = { colors: true };
+  const text = typeof value === 'string' ? value : util.inspect(value, INSPECT_OPTIONS);
+  return console.log(text);
+};
 
 const getAbsolutePath = (filenameOrURL) => {
   let filename;
@@ -20,5 +27,6 @@ const getAbsolutePath = (filenameOrURL) => {
 };
 
 module.exports = {
-  getAbsolutePath
+  getAbsolutePath,
+  print
 };

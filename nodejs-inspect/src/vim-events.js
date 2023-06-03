@@ -1,5 +1,6 @@
 const inspector = require('./inspector');
 const child = require('./child');
+const helpers = require('./helpers');
 let doAutoWatches = 0;
 
 const handleVimEvents = async (message) => {
@@ -25,7 +26,7 @@ const handleVimEvents = async (message) => {
       break;
     case 'nd_next':
       if (inspector.isRunning) {
-        print('Only available when paused(1)');
+        helpers.print('Only available when paused(1)');
         return;
       }
       inspector.handleResumed();
@@ -33,7 +34,7 @@ const handleVimEvents = async (message) => {
       break;
     case 'nd_into':
       if (inspector.isRunning) {
-        print('Only available when paused(2)');
+        helpers.print('Only available when paused(2)');
         return;
       }
       inspector.handleResumed();
@@ -41,7 +42,7 @@ const handleVimEvents = async (message) => {
       break;
     case 'nd_out':
       if (inspector.isRunning) {
-        print('Only available when paused(3)');
+        helpers.print('Only available when paused(3)');
         return;
       }
       inspector.handleResumed();
@@ -49,7 +50,7 @@ const handleVimEvents = async (message) => {
       break;
     case 'nd_pause':
       if (!inspector.isRunning) {
-        print('Only available when running(4)');
+        helpers.print('Only available when running(4)');
         return;
       }
       inspector.client.Debugger.pause();
@@ -61,7 +62,7 @@ const handleVimEvents = async (message) => {
       break;
     case 'nd_continue':
       if (inspector.isRunning) {
-        print('Only available when paused(5)');
+        helpers.print('Only available when paused(5)');
         return;
       }
       inspector.handleResumed();
@@ -74,16 +75,16 @@ const handleVimEvents = async (message) => {
         await inspector.restart();
       }, 100);
       break;
-      /*
     case 'nd_print':
-      print(message.txt)
-      break
+      helpers.print(message.txt);
+      break;
     case 'nd_addbrkpt':
-      await setBreakpoint(message.file, message.line)
-      break
+      await inspector.setBreakpoint(message.file, message.line);
+      break;
     case 'nd_removebrkpt':
-      await clearBreakpoint(message.file, message.line)
-      break
+      await inspector.removeBreakpoint(message.file, message.line);
+      break;
+      /*
     case 'nd_removeallbrkpts':
       Object.keys(message.breakpoints).map((file) => {
         Object.keys(message.breakpoints[file]).map((line) =>

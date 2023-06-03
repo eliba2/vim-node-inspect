@@ -2,14 +2,16 @@ const CDP = require('chrome-remote-interface');
 const { getAbsolutePath } = require('./helpers');
 const nvimBridge = require('./nvim-bridge');
 
-const knownScripts = [];
-
 class Inspector {
   constructor () {
     if (!Inspector.instance) {
       Inspector.instance = this;
       this.client = null;
       this.isRunning = false;
+      /* script source to id map */
+      this.knownScripts = {};
+      /* breakpoints likst */
+      this.knownBreakpoints = [];
     }
     return Inspector.instance;
   }
@@ -18,21 +20,97 @@ class Inspector {
     this.isRunning = true;
   }
 
-  onScriptParsed ({ scriptId, url }) {
-    knownScripts[scriptId] = url;
+  async onScriptParsed ({ scriptId, url }) {
+    this.knownScripts[scriptId] = url;
   }
 
-  onDebuggerPaused ({ callFrames, reason }) {
+  async setBreakpoint (script, lineNumber, condition, silent) {
+    const { Debugger } = this.client;
+    console.log('set ', script, lineNumber);
+    // get the scriptId
+    const scriptId = Object.keys(this.knownScripts).find(s => this.knownScripts[s] === `file://${script}`);
+    if (!scriptId) {
+      const m = { m: 'nd_brk_failed', file: script, line: lineNumber };
+      nvimBridge.send(m);
+      return;
+    }
+    Debugger.setBreakpoint({
+      location: {
+        scriptId,
+        lineNumber
+      }
+    }).then(async ({ breakpointId, actualLocation: location }) => {
+      const isExisting = this.knownBreakpoints.some((bp) => {
+        if (bp.breakpointId === breakpointId) {
+          Object.assign(bp, { location });
+          return true;
+        }
+        return false;
+      });
+      if (!isExisting) {
+        this.knownBreakpoints.push({ breakpointId, location });
+      }
+      // notify vim the breakpoint was resolved
+      let resolveFile = this.knownScripts[location.scriptId];
+      if (resolveFile.startsWith('file://')) {
+        resolveFile = resolveFile.slice(7);
+      }
+      const m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber };
+      nvimBridge.send(m);
+    }).catch(e => {
+      console.log('ERROR!', e);
+    });
+  }
+
+  async removeBreakpoint (script, lineNumber) {
+    const { Debugger } = this.client;
+    const breakpoint = this.knownBreakpoints.find(({ location }) => {
+      if (!location) return false;
+      const bpscript = this.knownScripts[location.scriptId];
+      if (!bpscript) return false;
+      return (
+        bpscript.indexOf(script) !== -1 && (location.lineNumber) === lineNumber
+      );
+    });
+    if (!breakpoint) {
+      console.error(`Could not find breakpoint at ${script}:${lineNumber}`);
+      return Promise.resolve();
+    }
+    return Debugger.removeBreakpoint({ breakpointId: breakpoint.breakpointId })
+      .then(() => {
+        const idx = this.knownBreakpoints.indexOf(breakpoint);
+        this.knownBreakpoints.splice(idx, 1);
+      });
+  }
+
+  async onDebuggerPaused ({ data, callFrames, reason, asyncStackTrace }) {
     this.isRunning = false;
-    // Save execution context's data
-    // currentBacktrace = client.Backtrace.from(callFrames);
-    // selectedFrame = currentBacktrace[0];
+
+    const { Runtime } = this.client;
+    const { scopeChain } = callFrames[0];
+    const localScope = scopeChain.find(scope => scope.type === 'local');
+
+    if (localScope) {
+      const { objectId } = localScope.object;
+      const properties = await Runtime.getProperties({ objectId });
+      if (properties && properties.result) {
+        const dontDisplay = {
+          exports: true,
+          require: true,
+          module: true,
+          __filename: true,
+          __dirname: true
+        };
+        const tokens = properties.result.filter(s => !dontDisplay[s.name]);
+        console.log(tokens);
+      }
+    }
+
     const frame = callFrames[0];
-    // console.log(frame);
     const { scriptId, lineNumber } = frame.location;
 
     // const breakType = reason === "other" ? "break" : reason;
-    const script = knownScripts[scriptId];
+    const script = this.knownScripts[scriptId];
     const scriptUrl = script ? getAbsolutePath(script) : '[unknown]';
 
     let scriptPrefix = '';
@@ -65,13 +143,14 @@ class Inspector {
     this.client = await CDP({ host: hostname, port: Number(port) });
     const { Debugger, Runtime } = this.client;
     try {
-      Debugger.paused((props) => {
+      Debugger.paused(async (props) => {
         console.log('paused !');
-        this.onDebuggerPaused(props);
+        await this.onDebuggerPaused(props);
         // client.Debugger.resume();
         // client.close();
       });
       Debugger.scriptParsed((props) => {
+        // console.log('=>>', props);
         this.onScriptParsed(props);
       });
       await Runtime.runIfWaitingForDebugger();
@@ -96,7 +175,7 @@ class Inspector {
 
   async stop () {
     return new Promise((resolve, reject) => {
-      knownScripts.length = 0;
+      this.knownScripts.length = 0;
       this.isRunning = false;
       if (this.client) {
         this.client.close().then(() => {
