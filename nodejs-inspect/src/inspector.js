@@ -1,6 +1,10 @@
 const CDP = require('chrome-remote-interface');
 const { getAbsolutePath } = require('./helpers');
 const nvimBridge = require('./nvim-bridge');
+const helpers = require('./helpers');
+
+// do we need it !!!???
+let repl2 = null;
 
 class Inspector {
   constructor () {
@@ -12,6 +16,8 @@ class Inspector {
       this.knownScripts = {};
       /* breakpoints likst */
       this.knownBreakpoints = [];
+      /* selected frame */
+      this.selectedFrame = null;
     }
     return Inspector.instance;
   }
@@ -58,11 +64,18 @@ class Inspector {
       const m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber };
       nvimBridge.send(m);
     }).catch(e => {
-      console.log('ERROR!', e);
+      /* can't set breakpoint at location */
+      if (e.message && e.message.indexOf('Could not resolve breakpoint') !== -1) {
+        helpers.print('Breakpoint cannot be set at location');
+      }
+      const m = { m: 'nd_brk_failed', file: script, line: lineNumber };
+      nvimBridge.send(m);
+      console.error(JSON.stringify(e));
     });
   }
 
   async removeBreakpoint (script, lineNumber) {
+    console.log('removing ', script, lineNumber);
     const { Debugger } = this.client;
     const breakpoint = this.knownBreakpoints.find(({ location }) => {
       if (!location) return false;
@@ -102,12 +115,13 @@ class Inspector {
           __dirname: true
         };
         const tokens = properties.result.filter(s => !dontDisplay[s.name]);
-        console.log(tokens);
+        // console.log(tokens);
       }
     }
 
     const frame = callFrames[0];
     const { scriptId, lineNumber } = frame.location;
+    this.selectedFrame = frame;
 
     // const breakType = reason === "other" ? "break" : reason;
     const script = this.knownScripts[scriptId];
@@ -142,15 +156,12 @@ class Inspector {
     const { hostname, port } = url;
     this.client = await CDP({ host: hostname, port: Number(port) });
     const { Debugger, Runtime } = this.client;
+    repl2 = this.client.Runtime;
     try {
       Debugger.paused(async (props) => {
-        console.log('paused !');
         await this.onDebuggerPaused(props);
-        // client.Debugger.resume();
-        // client.close();
       });
       Debugger.scriptParsed((props) => {
-        // console.log('=>>', props);
         this.onScriptParsed(props);
       });
       await Runtime.runIfWaitingForDebugger();
@@ -190,6 +201,30 @@ class Inspector {
   async restart () {
     await this.stop();
     this.start();
+  }
+
+  async evaluate (code) {
+    const inspector = new Inspector();
+    if (inspector.selectedFrame) {
+      const response = await inspector.client.Debugger.evaluateOnCallFrame({
+        callFrameId: inspector.selectedFrame.callFrameId,
+        expression: code,
+        objectGroup: 'node-inspect',
+        generatePreview: true,
+        includeCommandLineAPI: true,
+        silent: false
+      });
+      // console.log(JSON.stringify(response));
+      if (response?.result?.subtype === 'error') {
+        console.error('!> ', response.result.description);
+      } else console.log('>', response.result.description);
+      return response;
+    }
+    return inspector.client.Runtime.evaluate({
+      expression: code,
+      objectGroup: 'node-inspect',
+      generatePreview: true
+    });
   }
 }
 

@@ -84,28 +84,33 @@ const handleVimEvents = async (message) => {
     case 'nd_removebrkpt':
       await inspector.removeBreakpoint(message.file, message.line);
       break;
-      /*
     case 'nd_removeallbrkpts':
-      Object.keys(message.breakpoints).map((file) => {
+      // eslint-disable-next-line array-callback-return
+      Object.keys(message.breakpoints).map(file => {
         Object.keys(message.breakpoints[file]).map((line) =>
-          clearBreakpoint(file, Number(line))
-        )
-      })
-      break
+          inspector.removeBreakpoint(file, Number(line))
+        );
+      });
+      break;
     case 'nd_setbreakpoints':
-      Object.keys(message.breakpoints).map((file) => {
+      // eslint-disable-next-line array-callback-return
+      Object.keys(message.breakpoints).map(file => {
         Object.keys(message.breakpoints[file]).map(
-          async (line) => await setBreakpoint(file, Number(line))
-        )
-      })
-      break
+          async (line) => await inspector.setBreakpoint(file, Number(line))
+        );
+      });
+      break;
+    // NOT USED ??
     case 'nd_removebreakpoints':
+      // eslint-disable-next-line array-callback-return
       Object.keys(message.breakpoints).map((file) => {
         Object.keys(message.breakpoints[file]).map(
-          async (line) => await removeBreakpoint(file, Number(line))
-        )
-      })
-      break
+          async (line) => await inspector.removeBreakpoint(file, Number(line))
+        );
+      });
+      break;
+
+      /*
     case 'nd_verifyrestart':
       if (vimGetScripts()[message.file]) {
         const m = { m: 'nd_restartrequired' }

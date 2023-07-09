@@ -21,7 +21,7 @@ class InspectChild {
     });
   }
 
-  init (target, port, args) {
+  async init (target, port, args) {
     process.on('uncaughtException', (e) => {
       console.error('Cant start nodejs-inspect');
       console.error(e.message);
@@ -43,7 +43,7 @@ class InspectChild {
             nvimBridge.send(m);
           });
         });
-        return;
+        return Promise.resolve();
       }
       console.error(`!> ${data}`);
     });
@@ -54,6 +54,14 @@ class InspectChild {
 
     this.child.on('error', (code) => {
       console.log(`%> child error ${code}`);
+    });
+
+    return new Promise((resolve, reject) => {
+      this.child.on('spawn', () => {
+        // Child process has started
+        // console.log('started !!!');
+        resolve();
+      });
     });
   }
 

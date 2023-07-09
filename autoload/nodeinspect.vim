@@ -171,6 +171,12 @@ endfunction
 " remove all breakpoints. removes the signs is any
 " node inspect notification will ocuur only if started
 function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
+	" notify bride if up
+	if a:inspectNotify == 1 && s:status == 1
+		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
+		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
+	endif
+	" remove vim breakpoints
 	for filename in keys(s:breakpoints)
 		for line in keys(s:breakpoints[filename])
 			let signId = s:breakpoints[filename][line]
@@ -180,10 +186,6 @@ function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
 			endif
 		endfor
 	endfor
-	if a:inspectNotify == 1 && s:status == 1
-		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
-		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
-	endif
 endfunction
 
 " called when node resolves this to a location.

@@ -3,6 +3,7 @@ const { handleVimEvents } = require('./vim-events');
 const inspector = require('./inspector');
 const child = require('./child');
 const findOpenPort = require('./find_port');
+const nodeRepl = require('./node-repl');
 
 const startInspect = async (argv = process.argv.slice(2)) => {
   const request = argv[0];
@@ -12,9 +13,10 @@ const startInspect = async (argv = process.argv.slice(2)) => {
   if (request === 'launch') {
     /* find a suitable port for executing node, set url */
     const nodePort = await findOpenPort();
-    /* start client process */
-    child.init(target, nodePort, argv.slice(3));
+    /* start client process  */
+    await child.init(target, nodePort, argv.slice(3));
     url = `localhost:${nodePort}`;
+    nodeRepl.start({ child });
   } else {
     url = target;
   }
