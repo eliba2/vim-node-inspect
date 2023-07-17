@@ -13,12 +13,16 @@ class Repl {
   start ({ child, cdp }) {
     const replOptions = {
       prompt: '>> ',
-      eval: inspector.evaluate,
+      // eval: inspector.evaluate,
+      eval: async (input, _context, _filename, callback) => {
+        await inspector.evaluate(input);
+        callback(null);
+      },
       useGlobal: true,
       ignoreUndefined: false,
-      useColors: true
+      useColors: true,
+      terminal: true
     };
-
     this.repl = repl.start(replOptions);
   }
 }
