@@ -3,9 +3,6 @@ const { getAbsolutePath } = require('./helpers');
 const nvimBridge = require('./nvim-bridge');
 const helpers = require('./helpers');
 
-// do we need it !!!???
-let repl2 = null;
-
 class Inspector {
   constructor () {
     if (!Inspector.instance) {
@@ -115,7 +112,7 @@ class Inspector {
           __dirname: true
         };
         const tokens = properties.result.filter(s => !dontDisplay[s.name]);
-        // console.log(tokens);
+        console.log(tokens);
       }
     }
 
@@ -145,7 +142,7 @@ class Inspector {
       m: 'nd_stopped',
       file: `${scriptPrefix}${scriptUrl}`,
       line: lineNumber + 1,
-      backtrace: [], // Backtrace.getList(callFrames),
+      backtrace: helpers.getCallFrameList(callFrames, this.knownScripts),
       tokens
     };
     nvimBridge.send(m);
@@ -156,7 +153,6 @@ class Inspector {
     const { hostname, port } = url;
     this.client = await CDP({ host: hostname, port: Number(port) });
     const { Debugger, Runtime } = this.client;
-    repl2 = this.client.Runtime;
     try {
       Debugger.paused(async (props) => {
         await this.onDebuggerPaused(props);
@@ -210,14 +206,13 @@ class Inspector {
         callFrameId: inspector.selectedFrame.callFrameId,
         expression: code,
         objectGroup: 'node-inspect',
-        generatePreview: true,
+        // generatePreview: true,
         includeCommandLineAPI: true,
         silent: false
       });
-      // console.log(JSON.stringify(response));
       if (response?.result?.subtype === 'error') {
-        console.error('!> ', response.result.description);
-      } else console.log('>', response.result.description);
+        console.error('!< ', response.result.description);
+      } else console.log('<', response.result.description);
       return response;
     }
     return inspector.client.Runtime.evaluate({
