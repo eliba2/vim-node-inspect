@@ -320,7 +320,7 @@ function! s:onDebuggerStopped(mes)
 		call nodeinspect#backtrace#ClearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
 	" request watches update	
-	call nodeinspect#watches#UpdateWatches()
+	" call nodeinspect#watches#UpdateWatches()
 endfunction
 
 

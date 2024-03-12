@@ -7,25 +7,90 @@ let s:auto_sign = "A "
 function! OnTextModification()
 	call s:RecalcWatchesKeys()
 	"call s:Draw()
-	call s:updateWatches()
+	"call s:updateWatches()
 endfunction
+
+
+function! s:GetValue(value)
+	if a:value is v:null
+		let dispValue = 'null'
+	elseif a:value is v:true || a:value is v:false
+		if a:value
+			let dispValue = 'true'
+		else
+			let dispValue = 'false'
+		endif
+	else
+		let dispValue = string(a:value)
+	endif
+	return dispValue
+endfunction
+
+
+
+
+" Recursive function to format the data
+function! s:FormatData(data, prefix)
+		let lines = []
+		for key in keys(a:data)
+				let value = a:data[key]
+				if value['type'] == 'object' || value['type'] == 'array'
+						" Object or array, use '+'/'-' sign and recursive call
+						if (has_key(value, 'value'))
+							let prefixSign = a:prefix . '- '
+							if type(value['value']) == v:t_dict
+								if value['type'] == 'object'
+									let postfixSign = ' {}'
+								else
+									let postfixSign = ' []'
+								endif
+								call add(lines, prefixSign . key . postfixSign)
+								let childLines = s:FormatData(value['value'], a:prefix . '  ')
+								call extend(lines, childLines)
+							else
+								call add(lines, a:prefix . key . '  '  . s:GetValue(value['value']))
+							endif
+						else
+							call add(lines, a:prefix . '+ ' . key )
+						endif
+				else
+						" Primitive value, display as is
+						if has_key(value, 'value')
+							call add(lines, a:prefix . key . '  ' . s:GetValue(value['value']))
+						endif
+				endif
+		endfor
+		return lines
+endfunction
+
 
 
 function s:Draw()
 	let cur_win = win_getid()
 	let gotoResult = win_gotoid(s:inspect_win)
 	if gotoResult == 1
+    call setbufvar(s:inspect_buf, '&modifiable', 1)
 		" execute "set modifiable"
 		execute "%d"
 		" execute "set nomodifiable"
 		" loop here over all watches and update their values
-		for watch in keys(s:watches)
-			call append(getline('$'), watch."      ".s:watches[watch])
-		endfor
-		for watch in keys(s:auto_watches)
-			call append(getline('$'), s:auto_sign . watch."      ".s:auto_watches[watch])
-		endfor
+		"for watch in keys(s:watches)
+			"call append(getline('$'), watch."      ".s:watches[watch])
+		"endfor
+		"for watch in keys(s:auto_watches)
+			"call append(getline('$'), s:auto_sign . watch."      ".s:auto_watches[watch])
+		"endfor
 		" endofupdate
+
+
+		"let data = json_decode(s:auto_watches)
+		let data = s:auto_watches
+    let bufferContent = s:FormatData(data, '')
+  	call setbufline(s:inspect_buf, 1, bufferContent)
+    call setbufvar(s:inspect_buf, '&modifiable', 0)
+
+    " Prepare the content for the buffer
+
 		call win_gotoid(cur_win)
 		" execute "set modifiable"
 	endif
@@ -197,23 +262,7 @@ endfunction
 
 
 function nodeinspect#watches#ShowTokens(tokens)
-	let s:auto_watches = {}
-	if len(keys(a:tokens)) > 0
-		for tokenLine in keys(a:tokens)
-			if len(keys(a:tokens[tokenLine])) > 0
-				let tokenStrings = []
-				for token in keys(a:tokens[tokenLine])
-					" only add this if not added
-					if has_key(s:auto_watches, token) == 0
-						let s:auto_watches[token] = a:tokens[tokenLine][token]
-					endif
-					"call add(tokenStrings, [" ".token.": ", 'Constant'])
-					"call add(tokenStrings, [a:tokens[tokenLine][token], 'Comment'])
-				endfor
-				"call nvim_buf_set_virtual_text(0, -1, str2nr(tokenLine) - 1, tokenStrings, {})
-			endif
-		endfor
-	endif
+	let s:auto_watches = a:tokens
 	call s:Draw()
 endfunction
 

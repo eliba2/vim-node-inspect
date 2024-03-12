@@ -40,7 +40,7 @@ class Inspector {
     Debugger.setBreakpoint({
       location: {
         scriptId,
-        lineNumber
+        lineNumber: lineNumber - 1
       }
     }).then(async ({ breakpointId, actualLocation: location }) => {
       const isExisting = this.knownBreakpoints.some((bp) => {
@@ -58,7 +58,7 @@ class Inspector {
       if (resolveFile.startsWith('file://')) {
         resolveFile = resolveFile.slice(7);
       }
-      const m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber };
+      const m = { m: 'nd_brk_resolved', file: resolveFile, line: location.lineNumber + 1 };
       nvimBridge.send(m);
     }).catch(e => {
       /* can't set breakpoint at location */
@@ -93,26 +93,79 @@ class Inspector {
       });
   }
 
+  async parseTokens (tokens) {
+    const result = {};
+    for (let k = 0; k < tokens.length; k++) {
+      const token = tokens[k];
+      if (token?.value?.type === 'number' || token?.value?.type === 'string') {
+        result[token.name] = {
+          value: Number(token.value.value),
+          type: token.value.type
+        };
+      } else {
+        const { Runtime } = this.client;
+        if (token?.value?.type === 'object') {
+          // object || array
+          const objValues = {};
+          const properties = await Runtime.getProperties({
+            objectId: token.value.objectId,
+            ownProperties: true
+          });
+          for (const arrayProperty of properties.result) {
+            const { value } = arrayProperty;
+            if (['string', 'number', 'boolean', 'null', 'undefined'].includes((value.type))) {
+              objValues[arrayProperty.name] = {
+                type: value.type,
+                value: value.description || value.value
+              };
+            } else {
+              objValues[arrayProperty.name] = {
+                type: value.type,
+                value: value.value,
+                objectId: value.objectId
+              };
+            }
+            result[token.name] = {
+              type: token.value.subtype === 'array' ? 'array' : 'object',
+              value: objValues,
+              objectId: token.value.objectId
+            };
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   async onDebuggerPaused ({ data, callFrames, reason, asyncStackTrace }) {
+    const tokens = {};
+    const dontDisplay = {
+      exports: true,
+      require: true,
+      module: true,
+      __filename: true,
+      __dirname: true
+    };
     this.isRunning = false;
 
     const { Runtime } = this.client;
     const { scopeChain } = callFrames[0];
-    const localScope = scopeChain.find(scope => scope.type === 'local');
-
-    if (localScope) {
-      const { objectId } = localScope.object;
-      const properties = await Runtime.getProperties({ objectId });
-      if (properties && properties.result) {
-        const dontDisplay = {
-          exports: true,
-          require: true,
-          module: true,
-          __filename: true,
-          __dirname: true
-        };
-        const tokens = properties.result.filter(s => !dontDisplay[s.name]);
-        console.log(tokens);
+    // const availableScopes = ['local', 'global', 'closure'];
+    const availableScopes = ['local'];
+    for (const scopeType of availableScopes) {
+      tokens[scopeType] = {};
+      const scope = scopeChain.find(scope => scope.type === scopeType);
+      if (scope) {
+        const { objectId } = scope.object;
+        const properties = await Runtime.getProperties({ objectId });
+        if (properties && properties.result) {
+          const filteredTokens = properties.result.filter(s => !dontDisplay[s.name]);
+          tokens[scopeType] = {
+            value: await this.parseTokens(filteredTokens),
+            type: 'object',
+            objectId: scopeType
+          };
+        }
       }
     }
 
@@ -133,11 +186,6 @@ class Inspector {
     ) {
       scriptPrefix = '/';
     }
-    /* notify nvim */
-    const tokens = {};
-    // if (doAutoWatches) {
-    // tokens = await getTokens(`${scriptPrefix}${scriptUrl}`); // call get arguments and set the parameters to the stop function to display in the watch window
-    // }
     const m = {
       m: 'nd_stopped',
       file: `${scriptPrefix}${scriptUrl}`,
