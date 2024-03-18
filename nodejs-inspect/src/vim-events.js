@@ -110,6 +110,17 @@ const handleVimEvents = async (message) => {
       });
       break;
 
+    case 'nd_resolveobject':
+      {
+        const tokens = await inspector.resolveObject(message.objectId);
+        const m = {
+          m: 'nd_resolvedobject',
+          objectId: message.objectId,
+          tokens
+        };
+        message.nvim_bridge.send(m);
+      }
+      break;
       /*
     case 'nd_verifyrestart':
       if (vimGetScripts()[message.file]) {

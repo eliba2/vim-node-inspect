@@ -15,6 +15,8 @@ class Inspector {
       this.knownBreakpoints = [];
       /* selected frame */
       this.selectedFrame = null;
+      /* holds properties between steps */
+      this.properties = {};
     }
     return Inspector.instance;
   }
@@ -107,28 +109,35 @@ class Inspector {
         if (token?.value?.type === 'object') {
           // object || array
           const objValues = {};
-          const properties = await Runtime.getProperties({
-            objectId: token.value.objectId,
-            ownProperties: true
-          });
-          for (const arrayProperty of properties.result) {
-            const { value } = arrayProperty;
-            if (['string', 'number', 'boolean', 'null', 'undefined'].includes((value.type))) {
-              objValues[arrayProperty.name] = {
-                type: value.type,
-                value: value.description || value.value
-              };
-            } else {
-              objValues[arrayProperty.name] = {
-                type: value.type,
-                value: value.value,
-                objectId: value.objectId
+          if (token?.value?.objectId) {
+            const properties = await Runtime.getProperties({
+              objectId: token.value.objectId,
+              ownProperties: true
+            });
+            for (const arrayProperty of properties.result) {
+              const { value } = arrayProperty;
+              if (['string', 'number', 'boolean', 'null', 'undefined'].includes((value.type))) {
+                objValues[arrayProperty.name] = {
+                  type: value.type,
+                  value: value.description || value.value
+                };
+              } else {
+                objValues[arrayProperty.name] = {
+                  type: value.type,
+                  value: value.value,
+                  objectId: value.objectId
+                };
+              }
+              result[token.name] = {
+                type: token.value.subtype === 'array' ? 'array' : 'object',
+                value: objValues,
+                objectId: token.value.objectId
               };
             }
+          } else {
             result[token.name] = {
               type: token.value.subtype === 'array' ? 'array' : 'object',
-              value: objValues,
-              objectId: token.value.objectId
+              value: objValues
             };
           }
         }
@@ -138,7 +147,6 @@ class Inspector {
   }
 
   async onDebuggerPaused ({ data, callFrames, reason, asyncStackTrace }) {
-    const tokens = {};
     const dontDisplay = {
       exports: true,
       require: true,
@@ -147,20 +155,22 @@ class Inspector {
       __dirname: true
     };
     this.isRunning = false;
+    this.properties = {};
 
     const { Runtime } = this.client;
     const { scopeChain } = callFrames[0];
     // const availableScopes = ['local', 'global', 'closure'];
     const availableScopes = ['local'];
     for (const scopeType of availableScopes) {
-      tokens[scopeType] = {};
+      this.properties[scopeType] = {};
       const scope = scopeChain.find(scope => scope.type === scopeType);
       if (scope) {
         const { objectId } = scope.object;
         const properties = await Runtime.getProperties({ objectId });
         if (properties && properties.result) {
           const filteredTokens = properties.result.filter(s => !dontDisplay[s.name]);
-          tokens[scopeType] = {
+
+          this.properties[scopeType] = {
             value: await this.parseTokens(filteredTokens),
             type: 'object',
             objectId: scopeType
@@ -186,12 +196,13 @@ class Inspector {
     ) {
       scriptPrefix = '/';
     }
+    // console.log(JSON.stringify(this.properties, null, 2));
     const m = {
       m: 'nd_stopped',
       file: `${scriptPrefix}${scriptUrl}`,
       line: lineNumber + 1,
       backtrace: helpers.getCallFrameList(callFrames, this.knownScripts),
-      tokens
+      tokens: this.properties
     };
     nvimBridge.send(m);
   }
@@ -268,6 +279,25 @@ class Inspector {
       objectGroup: 'node-inspect',
       generatePreview: true
     });
+  }
+
+  async resolveObject (objectId) {
+    const { Runtime } = this.client;
+    const properties = await Runtime.getProperties({
+      objectId,
+      ownProperties: true
+    });
+    // console.log('resolveObject', properties);
+    try {
+      let tokens = [];
+      if (properties && properties.result) {
+        tokens = await this.parseTokens(properties.result);
+      }
+      return tokens;
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
   }
 }
 

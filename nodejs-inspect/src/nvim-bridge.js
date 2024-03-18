@@ -52,8 +52,8 @@ class NvimBridge {
         // single client support at this time
         this.client.on('data', (data) => {
           // console.log('client says',data.toString(), typeof(data));
-          const message_object = data.toString();
-          const message = JSON.parse(message_object);
+          const messageObject = data.toString();
+          const message = JSON.parse(messageObject);
           // add bridge to the message
           message.nvim_bridge = this;
           if (this.initiated === false && message.m === 'nd_init') {

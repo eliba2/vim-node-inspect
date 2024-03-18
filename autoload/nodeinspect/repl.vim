@@ -168,48 +168,48 @@ endfunction
 
 " hide the repl window
 function! nodeinspect#repl#HideReplWindow()
-	if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
-		execute "hide"
-	endif
+    if s:repl_win != -1 && win_gotoid(s:repl_win) == 1
+        execute "hide"
+    endif
 endfunction
 
 " create the repl win
 function nodeinspect#repl#ShowReplWindow(startWin)
-	if s:repl_buf == -1 || bufwinnr(s:repl_buf) == -1
-			" create according to g:nodeinspect_window_pos
-			if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
-				let rightSplitVal = &splitright
-				if g:nodeinspect_window_pos == 'right'
-					execute "set splitright"
-				elseif g:nodeinspect_window_pos == 'left'
-					execute "set nosplitright"
-				endif
+    if s:repl_buf == -1 || bufwinnr(s:repl_buf) == -1
+        " create according to g:nodeinspect_window_pos
+        if g:nodeinspect_window_pos == 'right' || g:nodeinspect_window_pos == 'left'
+            let rightSplitVal = &splitright
+            if g:nodeinspect_window_pos == 'right'
+                execute "set splitright"
+            elseif g:nodeinspect_window_pos == 'left'
+                execute "set nosplitright"
+            endif
 
-				if s:repl_buf == -1
-					execute "vert ".winwidth(a:startWin)/5*2."new"
-					let s:repl_buf = bufnr('%')
-					set nonu
-				else
-					execute "vert ".winwidth(a:startWin)/5*2."new | buffer" .s:repl_buf
-				endif
+            if s:repl_buf == -1
+                execute "vert ".winwidth(a:startWin)/5*2."new"
+                let s:repl_buf = bufnr('%')
+                set nonu
+            else
+                execute "vert ".winwidth(a:startWin)/5*2."new | buffer" .s:repl_buf
+            endif
 
-				if rightSplitVal == 0
-					execute "set nosplitright"
-				else
-					execute "set splitright"
-				endif
-			else
-				" bottom/ dk
-				if s:repl_buf == -1
-					execute "bo ".winheight(a:startWin)/5*2."new"
-					let s:repl_buf = bufnr('%')
-					set nonu
-				else
-					execute "bo ".winheight(a:startWin)/5*2."new | buffer " . s:repl_buf
-				endif
-			endif
-		let s:repl_win = win_getid()
-	endif
+            if rightSplitVal == 0
+                execute "set nosplitright"
+            else
+                execute "set splitright"
+            endif
+        else
+            " bottom/ dk
+            if s:repl_buf == -1
+                execute "bo ".winheight(a:startWin)/5*2."new"
+                let s:repl_buf = bufnr('%')
+                set nonu
+            else
+                execute "bo ".winheight(a:startWin)/5*2."new | buffer " . s:repl_buf
+            endif
+        endif
+        let s:repl_win = win_getid()
+    endif
 endfunction
 
 

@@ -16,12 +16,13 @@ const startInspect = async (argv = process.argv.slice(2)) => {
     /* start client process  */
     await child.init(target, nodePort, argv.slice(3));
     url = `localhost:${nodePort}`;
-    nodeRepl.start({ child });
   } else {
     url = target;
   }
   /* start node bridge */
   await bridge.init(port, handleVimEvents);
+  /* start repl */
+  nodeRepl.start({ child });
   /* start debugger */
   inspector.start(url);
 };

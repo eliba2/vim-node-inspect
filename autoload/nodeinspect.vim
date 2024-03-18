@@ -402,6 +402,8 @@ function! OnNodeMessage(channel, msgs)
 			" command mode)
 			elseif mes["m"] == "nd_repl_started"
 				call nodeinspect#utils#StartRepl()
+			elseif mes["m"] == "nd_resolvedobject"
+				call nodeinspect#watches#ResolvedObject(mes['objectId'], mes['tokens'])
 			else
 				echo "vim-node-inspect: unknown message ".mes["m"]
 			endif
