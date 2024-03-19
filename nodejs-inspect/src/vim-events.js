@@ -4,7 +4,7 @@ const helpers = require('./helpers');
 let doAutoWatches = 0;
 
 const handleVimEvents = async (message) => {
-  console.log('processing ', message.m);
+  // console.log('processing ', message.m);
   switch (message.m) {
     case 'nd_init':
       // init message. set state

@@ -19,7 +19,6 @@ class NvimBridge {
 
   send (msg) {
     if (this.client) {
-      // console.log("=> sending msg",msg);
       const message = JSON.stringify(msg) + MSG_DELIMITER;
       this.client.write(message);
     } else {
@@ -51,7 +50,6 @@ class NvimBridge {
         this.client = client;
         // single client support at this time
         this.client.on('data', (data) => {
-          // console.log('client says',data.toString(), typeof(data));
           const messageObject = data.toString();
           const message = JSON.parse(messageObject);
           // add bridge to the message
