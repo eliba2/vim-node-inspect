@@ -398,10 +398,6 @@ function! OnNodeMessage(channel, msgs)
 				call nodeinspect#NodeInspectStepInto()
 			elseif mes["m"] == "nd_repl_stepout"
 				call nodeinspect#NodeInspectStepOut()
-			" if the repl was started node-inspect, go to repl mode there (js
-			" command mode)
-			elseif mes["m"] == "nd_repl_started"
-				call nodeinspect#utils#StartRepl()
 			elseif mes["m"] == "nd_resolvedobject"
 				call nodeinspect#watches#ResolvedObject(mes['objectId'], mes['tokens'])
 			else

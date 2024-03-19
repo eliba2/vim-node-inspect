@@ -24,7 +24,7 @@ License: MIT (see VimNodeInspectLicense)
 
 Introduction                             *VimNodeInspectIntroduction*
 
-Debug node sctipts from (n)vim using the devtools protocol. Under the hood it uses a modified version of node-inspect (https://github.com/nodejs/node-inspect).
+Debug node sctipts from (n)vim using the devtools protocol.
 
 
 ====================================================================
@@ -220,10 +220,6 @@ The debugger windows appear on the bottom by default. Set it with the following 
 
 let g:nodeinspect_window_pos = 'right'|'left'|'bottom'.
 
-The command window starts in repl mode by default. It gives you a javascript shell corresponding to the current scope. If you are familiar with node-inspect and/or want to use the command mode - which enables executing debugging commands manually - use the following setting:
-
-let g:nodeinspect_start_repl = 0
-
 
 ====================================================================
 Limitation							*VimNodeInspectLimitation*
@@ -235,6 +231,5 @@ Windows container support was not tested. It might or might not work.
 ====================================================================
 License									*VimNodeInspectLicense*
 
-MIT. Similar to the one used in node-inspect. See https://github.com/nodejs/node-inspect/blob/master/LICENSE.
-
+MIT.
 

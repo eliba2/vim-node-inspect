@@ -1,0 +1,14 @@
+Note	doc/vim-node-inspect.txt	/*Note*
+VimNodeInspectBreakpoints	doc/vim-node-inspect.txt	/*VimNodeInspectBreakpoints*
+VimNodeInspectCommands	doc/vim-node-inspect.txt	/*VimNodeInspectCommands*
+VimNodeInspectConfiguration	doc/vim-node-inspect.txt	/*VimNodeInspectConfiguration*
+VimNodeInspectContainers	doc/vim-node-inspect.txt	/*VimNodeInspectContainers*
+VimNodeInspectContents	doc/vim-node-inspect.txt	/*VimNodeInspectContents*
+VimNodeInspectCustomization	doc/vim-node-inspect.txt	/*VimNodeInspectCustomization*
+VimNodeInspectIntroduction	doc/vim-node-inspect.txt	/*VimNodeInspectIntroduction*
+VimNodeInspectLicense	doc/vim-node-inspect.txt	/*VimNodeInspectLicense*
+VimNodeInspectLimitation	doc/vim-node-inspect.txt	/*VimNodeInspectLimitation*
+VimNodeInspectRequirements	doc/vim-node-inspect.txt	/*VimNodeInspectRequirements*
+VimNodeInspectStarting	doc/vim-node-inspect.txt	/*VimNodeInspectStarting*
+VimNodeInspectWatches	doc/vim-node-inspect.txt	/*VimNodeInspectWatches*
+vim-node-inspect	doc/vim-node-inspect.txt	/*vim-node-inspect*

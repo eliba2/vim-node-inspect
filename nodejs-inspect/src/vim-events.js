@@ -136,9 +136,6 @@ const handleVimEvents = async (message) => {
       }
       message.nvim_bridge.send(m)
       break
-    case 'nd_repl_set_execmode':
-      startCliRepl()
-      break
 */
     default:
       console.error('unknown message from vim', JSON.stringify(message));

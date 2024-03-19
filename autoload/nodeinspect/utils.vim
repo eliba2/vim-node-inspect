@@ -9,7 +9,7 @@ function! nodeinspect#utils#SendEvent(e)
 		endif
 	elseif type(s:channel) == 9 && ch_status(s:channel) == "open"
 		call ch_sendraw(s:channel, a:e)
-        sleep 5m
+		sleep 5m
 	endif
 endfunction
 
@@ -52,12 +52,3 @@ function nodeinspect#utils#CloseChannel()
 		call ch_close(s:channel)
 	endif	
 endfunction
-
-
-function nodeinspect#utils#StartRepl()
-	if g:nodeinspect_start_repl == 1
-		call nodeinspect#utils#SendEvent('{"m": "nd_repl_set_execmode"}')
-		sleep 50m
-	endif
-endfunction
-
