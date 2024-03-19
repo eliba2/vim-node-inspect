@@ -2,7 +2,7 @@
 Interactive node debugger for (n)vim.
 
 ## Description
-Node debugging capabilities for (n)vim using the devtools protocol. Under the hood it wraps a modified version of node-inspect *(https://github.com/nodejs/node-inspect)*.
+Node debugging capabilities for (n)vim using the devtools protocol.
 
 
 [![asciicast](https://asciinema.org/a/NOCL8Fc3LcQjVDD0CIR08I698.svg)](https://asciinema.org/a/NOCL8Fc3LcQjVDD0CIR08I698)
@@ -18,13 +18,14 @@ Plug 'eliba2/vim-node-inspect'
 ```
 
 ## How to use
-Either start a node script or attach to an already running script. Both can be done manually (NodeIndpectStart/NodeInspectRun) or using the configuration file vim-node-config.json. The later is encouraged.
 
-For full documentation see :h vim-node-inspect.
+Use the plugin to start a script with *NodeInspectStart*/*NodeInspectRun* or attach to an already running script using *NodeInspectConnect*. Additional configuration can be set with the vim-node-config.json configuration file.
 
-### Starting Manually ###
+For full documentation see `:h vim-node-inspect`.
 
-Either start debugging a local js file (via NodeInspectStart or NodeInspectRun) or connect to a running instance using NodeInspectConnect. In the later case the target must start with --inspect (e.g. node --inspect server.js). 
+### W/O A configuration file ###
+
+Use NodeInspectStart or NodeInspectRun which starts the script in the current buffer using `node --inspect <script>`. An already running script can be attached using NodeInspectConnect address:port. In the later case the target must start with --inspect (e.g. `node --inspect server.js`). 
 
 ### Using the configuration file ###
 
@@ -123,8 +124,6 @@ Usage in this case would be either *NodeInspectStart "run"* or *NodeInspectStart
 
 ## Available Commands
 
-The following commands are available:
-
 **NodeInspectStart [config name] [args]** - Starts debugger, paused
 
 **NodeInspectRun [config name] [args]** - Continue / Start and run immediatly
@@ -150,13 +149,16 @@ The following commands are available:
 
 There are no default bindings; the following is added for convinience:
 ```
-nnoremap <silent><F4> :NodeInspectStart<cr>
-nnoremap <silent><F5> :NodeInspectRun<cr>
-nnoremap <silent><F6> :NodeInspectConnect("127.0.0.1:9229")<cr>
-nnoremap <silent><F7> :NodeInspectStepInto<cr>
-nnoremap <silent><F8> :NodeInspectStepOver<cr>
-nnoremap <silent><F9> :NodeInspectToggleBreakpoint<cr>
-nnoremap <silent><F10> :NodeInspectStop<cr>
+nnoremap <silent><leader>dd :NodeInspectStart<cr>
+nnoremap <silent><leader>dr :NodeInspectRun<cr>
+nnoremap <silent><leader>dc :NodeInspectConnect("127.0.0.1:9229")<cr>
+nnoremap <silent><leader>ds :NodeInspectStepOver<cr>
+nnoremap <silent><leader>di :NodeInspectStepInto<cr>
+nnoremap <silent><leader>do :NodeInspectStepOut<cr>
+nnoremap <silent><leader>dq :NodeInspectStop<cr>
+nnoremap <silent><leader>db :NodeInspectToggleBreakpoint<cr>
+nnoremap <silent><leader>da :NodeInspectRemoveAllBreakpoints<cr>
+nnoremap <silent><leader>dw :NodeInspectToggleWindow<cr>
 ```
 
 ## Breakpoints
@@ -200,13 +202,6 @@ The debugger windows appear on the bottom by default. Change it by using
 let g:nodeinspect_window_pos = 'right'|'left'|'bottom'
 ```
 
-The command window starts in repl mode by default. It gives you a javascript shell corresponding to the current scope. If you are familiar with node-inspect and/or want to use the command mode - which enables executing debugging commands manually - use the following setting:
-
-```
-let g:nodeinspect_start_repl = 0
-```
-
-
 ## Remarks
 In beta. Means its useful; things may change or fail.
 
@@ -217,21 +212,21 @@ Tested on Linux (debian), OSX, Windows.
 
 * Debugging window
 	* Detachable 
-	* position change
+	* ~~position change~~
 * Watches
-	* Auto watches
-	* Open/Close properties
+	* ~~Auto watches~~
+	* ~~Open/Close properties~~
 	* On the fly evaluation (popup)
 * Breakpoints
 	* Breakpoints window
 * Call stack
 	* Auto jump
-* Windows Support
+* ~~Windows Support~~
 
 
 ## Contributing
 
-PR are welcome. Open a new issue in case you find a bug; you can also create a PR fixing it yourself of course.
+PRs welcome. Open a new issue in case you find a bug; you can also create a PR fixing it yourself of course.
 Please follow the general code style (look@the code) and in your pull request explain the reason for the proposed change.
 
 

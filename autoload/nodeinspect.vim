@@ -1,4 +1,4 @@
-let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting
+let s:status = 0 " 0 - not started. 1 - started 2 - session ended (bridge exists, node exited) 3 - restarting (not used)
 let s:plugin_path = expand('<sfile>:h:h')
 let s:sign_id = 2
 let s:brkpt_sign_id = 3
@@ -171,6 +171,12 @@ endfunction
 " remove all breakpoints. removes the signs is any
 " node inspect notification will ocuur only if started
 function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
+	" notify bride if up
+	if a:inspectNotify == 1 && s:status == 1
+		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
+		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
+	endif
+	" remove vim breakpoints
 	for filename in keys(s:breakpoints)
 		for line in keys(s:breakpoints[filename])
 			let signId = s:breakpoints[filename][line]
@@ -180,10 +186,6 @@ function! s:NodeInspectRemoveAllBreakpoints(inspectNotify)
 			endif
 		endfor
 	endfor
-	if a:inspectNotify == 1 && s:status == 1
-		let remoteFiles = s:getRemoteBreakpointsObj(s:breakpoints)
-		call nodeinspect#utils#SendEvent('{"m": "nd_removeallbrkpts", "breakpoints":' . json_encode(remoteFiles) . '}')
-	endif
 endfunction
 
 " called when node resolves this to a location.
@@ -318,7 +320,7 @@ function! s:onDebuggerStopped(mes)
 		call nodeinspect#backtrace#ClearBacktraceWindow('Debugger Stopped. Source file is not available')
 	endif
 	" request watches update	
-	call nodeinspect#watches#UpdateWatches()
+	" call nodeinspect#watches#UpdateWatches()
 endfunction
 
 
@@ -396,10 +398,8 @@ function! OnNodeMessage(channel, msgs)
 				call nodeinspect#NodeInspectStepInto()
 			elseif mes["m"] == "nd_repl_stepout"
 				call nodeinspect#NodeInspectStepOut()
-			" if the repl was started node-inspect, go to repl mode there (js
-			" command mode)
-			elseif mes["m"] == "nd_repl_started"
-				call nodeinspect#utils#StartRepl()
+			elseif mes["m"] == "nd_resolvedobject"
+				call nodeinspect#watches#ResolvedObject(mes['objectId'], mes['tokens'])
 			else
 				echo "vim-node-inspect: unknown message ".mes["m"]
 			endif
@@ -582,8 +582,8 @@ function! s:NodeInspectStart()
 				let s:session["script"] = expand('%:p')
 			endif
 		endif
-		" set the status to running, might be at ended(2)
-		let s:status = 3
+		" set the status to started, might be at ended(2)
+		let s:status = 1
         " restarting might need to restart external jobs, if any
 		let repl_result = nodeinspect#repl#StartExternalJobs(s:session)
 		if repl_result != 0
@@ -592,6 +592,8 @@ function! s:NodeInspectStart()
 			return
 		endif
 		" remove all breakpoint, they will be resolved by node-inspect
+	echom "status is ".s:status
+		
 		call s:removeSign()
 		call nodeinspect#backtrace#ClearBacktraceWindow()
 		call nodeinspect#utils#SendEvent('{"m": "nd_restart", "script": "'. s:session["script"] . '","args": ' . json_encode(s:session["args"]) . '}')
@@ -616,7 +618,6 @@ function! s:NodeInspectStart()
 	for watch in keys(s:session["watches"])
 		call nodeinspect#watches#AddBulk(s:session["watches"])
 	endfor
-
 endfunction
 
 
@@ -655,7 +656,7 @@ endfunction
 
 function! nodeinspect#NodeInspectStepOver()
 	if s:status != 1
-		echo "node-inspect not started"
+		echo "node-inspect not started ".s:status
 		return
 	endif
 	call s:NodeInspectStepOver()
