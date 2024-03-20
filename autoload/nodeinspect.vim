@@ -15,7 +15,7 @@ let g:nodeinspect_window_pos = get(g:, 'nodeinspect_window_pos', "bottom")
 let g:nodeinspect_auto_watch = get(g:, 'nodeinspect_auto_watch', 1)
 let g:nodeinspect_start_repl = get(g:, 'nodeinspect_start_repl', 1)
 
-highlight default NodeInspectBreakpoint ctermfg=0 ctermbg=11 guifg=#E6E1CF guibg=#FF3333
+highlight default NodeInspectBreakpoint ctermfg=red guifg=red
 highlight default NodeInspectSign ctermfg=12 ctermbg=6 gui=bold guifg=Blue guibg=DarkCyan
 
 autocmd VimLeavePre * call OnVimLeavePre()
@@ -42,9 +42,9 @@ endfunction
 
 function! s:SignInit()
 	" debug sign 
-	execute "sign define " . s:sign_cur_exec . " text=>> texthl=NodeInspectSign linehl=NodeInspectSign"
+	execute "sign define " . s:sign_cur_exec . " text=➤ texthl=NodeInspectSign linehl=NodeInspectSign"
 	" breakpoint sign
-	execute "sign define " . s:sign_brkpt . " text=() texthl=NodeInspectBreakpoint"
+	execute "sign define " . s:sign_brkpt . " text=● texthl=NodeInspectBreakpoint"
 endfunction
 
 
