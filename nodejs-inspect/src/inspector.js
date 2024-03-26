@@ -1,4 +1,4 @@
-const CDP = require('chrome-remote-interface');
+const CDP = require('../lib/chrome-remote-interface');
 const { getAbsolutePath } = require('./helpers');
 const nvimBridge = require('./nvim-bridge');
 const helpers = require('./helpers');

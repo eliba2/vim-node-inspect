@@ -1,7 +1,4 @@
 {
-  "dependencies": {
-    "chrome-remote-interface": "^0.32.2"
-  },
   "devDependencies": {
     "eslint": "^8.40.0",
     "eslint-config-standard": "^17.0.0",
