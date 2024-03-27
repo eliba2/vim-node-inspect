@@ -147,7 +147,7 @@ function! nodeinspect#treectl#Render()
 	if has('nvim')
 		call nvim_buf_set_lines(s:buffer, 0, -1, v:false, [])
 	else
-		call delbufline(s:buffer, 1, '$')
+		call deletebufline(s:buffer, 1, '$')
 	endif
 	let s:initialLine = v:true
 	let s:buf_to_tree = {}
